@@ -4,6 +4,7 @@ import { expenseCategories } from "../../constants/initialData";
 export default function ExpenseModal({
   isOpen,
   onClose,
+  editingExpense,
   expenseForm,
   setExpenseForm,
   onSave
@@ -16,7 +17,7 @@ export default function ExpenseModal({
         <div className="modal-heading">
           <div>
             <span className="eyebrow">BUDGET LOG</span>
-            <h2>Record Food Expense</h2>
+            <h2>{editingExpense ? "Edit Expense Entry" : "Record Food Expense"}</h2>
           </div>
           <button type="button" onClick={onClose}><X size={18} /></button>
         </div>
@@ -58,8 +59,17 @@ export default function ExpenseModal({
           </label>
         </div>
 
+        <label>
+          Date
+          <input
+            type="date"
+            value={expenseForm.date || ""}
+            onChange={(e) => setExpenseForm({ ...expenseForm, date: e.target.value })}
+          />
+        </label>
+
         <button className="btn btn-green modal-submit" type="submit">
-          Save Expense Entry
+          {editingExpense ? "Update Expense" : "Save Expense Entry"}
         </button>
       </form>
     </div>

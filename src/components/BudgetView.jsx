@@ -1,5 +1,16 @@
-import { Plus, CircleDollarSign, Wallet, Utensils, Trash2, Sparkles } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Plus, CircleDollarSign, Wallet, Utensils, Trash2, Sparkles, Pencil } from "lucide-react";
 import { prettyDate } from "../utils/dateUtils";
+import { expenseCategories } from "../constants/initialData";
+
+const categoryColors = {
+  Groceries: "#52785c",
+  Produce: "#7aa67f",
+  "Dining Out": "#c27c51",
+  Bakery: "#d4a373",
+  Beverages: "#638ca6",
+  Other: "#9382ab"
+};
 
 export default function BudgetView({
   budget,
@@ -9,8 +20,38 @@ export default function BudgetView({
   budgetPercent,
   expenses,
   onDeleteExpense,
-  onOpenExpenseModal
+  onOpenExpenseModal,
+  onOpenEditExpense
 }) {
+  const [selectedCategory, setSelectedCategory] = useState("All");
+
+  // Category breakdown calculation
+  const categoryBreakdown = useMemo(() => {
+    if (totalSpent === 0) return [];
+    const map = {};
+    expenses.forEach((e) => {
+      const cat = e.category || "Other";
+      map[cat] = (map[cat] || 0) + Number(e.amount);
+    });
+
+    return Object.entries(map).map(([name, amount]) => ({
+      name,
+      amount,
+      percent: Math.round((amount / totalSpent) * 100),
+      color: categoryColors[name] || "#8e9a90"
+    })).sort((a, b) => b.amount - a.amount);
+  }, [expenses, totalSpent]);
+
+  // Analytics
+  const avgExpense = expenses.length > 0 ? Math.round(totalSpent / expenses.length) : 0;
+  const maxExpense = expenses.length > 0 ? Math.max(...expenses.map((e) => Number(e.amount) || 0)) : 0;
+
+  // Filtered expense list
+  const filteredExpenses = expenses.filter((e) => {
+    if (selectedCategory === "All") return true;
+    return e.category === selectedCategory;
+  });
+
   return (
     <>
       <div className="page-heading">
@@ -86,7 +127,61 @@ export default function BudgetView({
         </div>
       </div>
 
-      {/* Expenses List & Notes */}
+      {/* Analytics Mini Stats */}
+      <div className="budget-stats-row">
+        <div className="budget-stat-mini">
+          <span>AVERAGE ENTRY</span>
+          <strong>₹{avgExpense.toLocaleString("en-IN")}</strong>
+        </div>
+        <div className="budget-stat-mini">
+          <span>HIGHEST EXPENSE</span>
+          <strong>₹{maxExpense.toLocaleString("en-IN")}</strong>
+        </div>
+        <div className="budget-stat-mini">
+          <span>RECORDED TRANSACTIONS</span>
+          <strong>{expenses.length} entries</strong>
+        </div>
+      </div>
+
+      {/* Category Breakdown Visual Chart */}
+      {categoryBreakdown.length > 0 && (
+        <div className="chart-card">
+          <div className="chart-header">
+            <h3>Spending by Category</h3>
+            <span>{categoryBreakdown.length} active spending categories</span>
+          </div>
+
+          {/* Multi-segmented bar */}
+          <div className="chart-bar-container">
+            {categoryBreakdown.map((cat) => (
+              <div
+                key={cat.name}
+                className="chart-bar-segment"
+                style={{
+                  width: `${cat.percent}%`,
+                  background: cat.color
+                }}
+                title={`${cat.name}: ₹${cat.amount} (${cat.percent}%)`}
+              />
+            ))}
+          </div>
+
+          {/* Legend chips */}
+          <div className="chart-legend">
+            {categoryBreakdown.map((cat) => (
+              <div className="chart-legend-item" key={cat.name}>
+                <span className="chart-dot" style={{ background: cat.color }} />
+                <div className="chart-legend-copy">
+                  <strong>{cat.name} ({cat.percent}%)</strong>
+                  <span>₹{cat.amount.toLocaleString("en-IN")}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Expenses List & Filter Chips */}
       <div className="budget-lower">
         <div className="surface-card expense-panel">
           <div className="section-heading">
@@ -97,19 +192,52 @@ export default function BudgetView({
             <CircleDollarSign size={18} className="sparkle-mark" />
           </div>
 
-          {expenses.length === 0 ? (
+          {/* Filter Chips */}
+          <div className="chip-group">
+            <button
+              className={`chip ${selectedCategory === "All" ? "active" : ""}`}
+              onClick={() => setSelectedCategory("All")}
+            >
+              All Categories <span className="chip-count">{expenses.length}</span>
+            </button>
+            {expenseCategories.map((cat) => {
+              const count = expenses.filter((e) => e.category === cat).length;
+              if (count === 0 && selectedCategory !== cat) return null;
+              return (
+                <button
+                  key={cat}
+                  className={`chip ${selectedCategory === cat ? "active" : ""}`}
+                  onClick={() => setSelectedCategory(cat)}
+                >
+                  {cat} <span className="chip-count">{count}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {filteredExpenses.length === 0 ? (
             <div className="empty-state">
               <Wallet size={36} style={{ margin: "0 auto 12px", opacity: 0.3 }} />
-              <p>No expenses recorded yet. Log your first expenditure.</p>
+              <p>
+                {expenses.length === 0
+                  ? "No expenses recorded yet. Log your first expenditure."
+                  : `No expenses logged under "${selectedCategory}".`}
+              </p>
               <button className="btn btn-green" onClick={onOpenExpenseModal} style={{ marginTop: 10 }}>
                 <Plus size={15} /> Add first expense
               </button>
             </div>
           ) : (
             <div>
-              {expenses.map((expense) => (
+              {filteredExpenses.map((expense) => (
                 <div className="expense-row" key={expense.id}>
-                  <div className="expense-icon">
+                  <div
+                    className="expense-icon"
+                    style={{
+                      background: `${categoryColors[expense.category] || "#6d896f"}18`,
+                      color: categoryColors[expense.category] || "#6d896f"
+                    }}
+                  >
                     <Utensils size={16} />
                   </div>
                   <div className="expense-copy">
@@ -119,12 +247,22 @@ export default function BudgetView({
                   <strong className="expense-amount">
                     ₹{Number(expense.amount).toLocaleString("en-IN")}
                   </strong>
-                  <button
-                    onClick={() => onDeleteExpense(expense.id)}
-                    title="Delete expense"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                  <div className="grocery-actions">
+                    <button
+                      className="row-action-btn"
+                      onClick={() => onOpenEditExpense(expense)}
+                      title="Edit expense"
+                    >
+                      <Pencil size={13} />
+                    </button>
+                    <button
+                      className="row-action-btn delete-btn"
+                      onClick={() => onDeleteExpense(expense.id)}
+                      title="Delete expense"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

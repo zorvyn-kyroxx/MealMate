@@ -4,6 +4,7 @@ import { groceryCategories } from "../../constants/initialData";
 export default function GroceryModal({
   isOpen,
   onClose,
+  editingGrocery,
   groceryForm,
   setGroceryForm,
   onSave
@@ -16,7 +17,7 @@ export default function GroceryModal({
         <div className="modal-heading">
           <div>
             <span className="eyebrow">SHOPPING LIST</span>
-            <h2>Add Grocery Item</h2>
+            <h2>{editingGrocery ? "Edit Grocery Item" : "Add Grocery Item"}</h2>
           </div>
           <button type="button" onClick={onClose}><X size={18} /></button>
         </div>
@@ -42,7 +43,7 @@ export default function GroceryModal({
           </label>
 
           <label>
-            Category
+            Category / Aisle
             <select
               value={groceryForm.category}
               onChange={(e) => setGroceryForm({ ...groceryForm, category: e.target.value })}
@@ -55,7 +56,7 @@ export default function GroceryModal({
         </div>
 
         <button className="btn btn-green modal-submit" type="submit">
-          Add to Grocery Checklist
+          {editingGrocery ? "Update Grocery Item" : "Add to Grocery Checklist"}
         </button>
       </form>
     </div>

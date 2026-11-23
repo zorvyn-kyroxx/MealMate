@@ -47,6 +47,8 @@ export default function App() {
   const [modal, setModal] = useState(""); // "meal" | "recipe" | "recipeDetail" | "grocery" | "expense"
   const [editingMeal, setEditingMeal] = useState(null);
   const [editingRecipe, setEditingRecipe] = useState(null);
+  const [editingGrocery, setEditingGrocery] = useState(null);
+  const [editingExpense, setEditingExpense] = useState(null);
   const [selectedRecipe, setSelectedRecipe] = useState(null);
 
   const [mealForm, setMealForm] = useState({
@@ -59,7 +61,7 @@ export default function App() {
   });
   const [recipeForm, setRecipeForm] = useState(blankRecipe);
   const [groceryForm, setGroceryForm] = useState({ name: "", amount: "1 pack", category: "Produce" });
-  const [expenseForm, setExpenseForm] = useState({ title: "", amount: "", category: "Groceries" });
+  const [expenseForm, setExpenseForm] = useState({ title: "", amount: "", category: "Groceries", date: dateKey(today) });
   const [notification, setNotification] = useState("");
 
   // Sync to LocalStorage
@@ -228,7 +230,7 @@ export default function App() {
     const newItems = recipe.ingredients.map((ing, i) => ({
       id: Date.now() + i,
       name: ing,
-      amount: "1 recipe portion",
+      amount: "1 portion",
       category: "Produce",
       done: false
     }));
@@ -281,21 +283,46 @@ export default function App() {
     showNotification("Recipe deleted.");
   };
 
-  // Grocery Handlers
-  const addGroceryItem = (e) => {
+  // Grocery Handlers (Add + Edit)
+  const openNewGrocery = () => {
+    setEditingGrocery(null);
+    setGroceryForm({ name: "", amount: "1 pack", category: "Produce" });
+    setModal("grocery");
+  };
+
+  const openEditGrocery = (item) => {
+    setEditingGrocery(item);
+    setGroceryForm({ name: item.name, amount: item.amount, category: item.category });
+    setModal("grocery");
+  };
+
+  const saveGroceryItem = (e) => {
     e.preventDefault();
     if (!groceryForm.name.trim()) return;
-    const newItem = {
-      id: Date.now(),
-      name: groceryForm.name.trim(),
-      amount: groceryForm.amount.trim() || "1 item",
-      category: groceryForm.category || "Produce",
-      done: false
-    };
-    setGroceries((prev) => [...prev, newItem]);
+
+    if (editingGrocery) {
+      setGroceries((prev) =>
+        prev.map((g) =>
+          g.id === editingGrocery.id
+            ? { ...g, name: groceryForm.name.trim(), amount: groceryForm.amount.trim() || "1 item", category: groceryForm.category }
+            : g
+        )
+      );
+      showNotification("Grocery item updated!");
+    } else {
+      const newItem = {
+        id: Date.now(),
+        name: groceryForm.name.trim(),
+        amount: groceryForm.amount.trim() || "1 item",
+        category: groceryForm.category || "Produce",
+        done: false
+      };
+      setGroceries((prev) => [...prev, newItem]);
+      showNotification("Added item to grocery list!");
+    }
+
     setGroceryForm({ name: "", amount: "1 pack", category: "Produce" });
     setModal("");
-    showNotification("Added item to grocery list!");
   };
 
   const toggleGroceryDone = (id) => {
@@ -306,6 +333,7 @@ export default function App() {
 
   const deleteGrocery = (id) => {
     setGroceries((prev) => prev.filter((item) => item.id !== id));
+    showNotification("Item removed.");
   };
 
   const clearCompletedGroceries = () => {
@@ -313,22 +341,58 @@ export default function App() {
     showNotification("Cleared completed grocery items.");
   };
 
-  // Expense Handlers
-  const addExpenseItem = (e) => {
+  // Expense Handlers (Add + Edit)
+  const openNewExpense = () => {
+    setEditingExpense(null);
+    setExpenseForm({ title: "", amount: "", category: "Groceries", date: dateKey(today) });
+    setModal("expense");
+  };
+
+  const openEditExpense = (expense) => {
+    setEditingExpense(expense);
+    setExpenseForm({
+      title: expense.title,
+      amount: String(expense.amount),
+      category: expense.category,
+      date: expense.date || dateKey(today)
+    });
+    setModal("expense");
+  };
+
+  const saveExpenseItem = (e) => {
     e.preventDefault();
     const amt = Number(expenseForm.amount);
     if (!expenseForm.title.trim() || amt <= 0) return;
-    const newExp = {
-      id: Date.now(),
-      title: expenseForm.title.trim(),
-      amount: amt,
-      category: expenseForm.category || "Groceries",
-      date: dateKey(today)
-    };
-    setExpenses((prev) => [newExp, ...prev]);
-    setExpenseForm({ title: "", amount: "", category: "Groceries" });
+
+    if (editingExpense) {
+      setExpenses((prev) =>
+        prev.map((exp) =>
+          exp.id === editingExpense.id
+            ? {
+                ...exp,
+                title: expenseForm.title.trim(),
+                amount: amt,
+                category: expenseForm.category || "Groceries",
+                date: expenseForm.date || dateKey(today)
+              }
+            : exp
+        )
+      );
+      showNotification("Expense updated!");
+    } else {
+      const newExp = {
+        id: Date.now(),
+        title: expenseForm.title.trim(),
+        amount: amt,
+        category: expenseForm.category || "Groceries",
+        date: expenseForm.date || dateKey(today)
+      };
+      setExpenses((prev) => [newExp, ...prev]);
+      showNotification("Expense recorded!");
+    }
+
+    setExpenseForm({ title: "", amount: "", category: "Groceries", date: dateKey(today) });
     setModal("");
-    showNotification("Expense recorded!");
   };
 
   const deleteExpense = (id) => {
@@ -457,8 +521,10 @@ export default function App() {
               onToggleGroceryDone={toggleGroceryDone}
               onDeleteGrocery={deleteGrocery}
               onClearCompletedGroceries={clearCompletedGroceries}
-              onOpenGroceryModal={() => setModal("grocery")}
+              onOpenGroceryModal={openNewGrocery}
+              onOpenEditGrocery={openEditGrocery}
               onNavigate={setPage}
+              showNotification={showNotification}
             />
           )}
 
@@ -471,7 +537,8 @@ export default function App() {
               budgetPercent={budgetPercent}
               expenses={expenses}
               onDeleteExpense={deleteExpense}
-              onOpenExpenseModal={() => setModal("expense")}
+              onOpenExpenseModal={openNewExpense}
+              onOpenEditExpense={openEditExpense}
             />
           )}
         </div>
@@ -514,17 +581,19 @@ export default function App() {
       <GroceryModal
         isOpen={modal === "grocery"}
         onClose={() => setModal("")}
+        editingGrocery={editingGrocery}
         groceryForm={groceryForm}
         setGroceryForm={setGroceryForm}
-        onSave={addGroceryItem}
+        onSave={saveGroceryItem}
       />
 
       <ExpenseModal
         isOpen={modal === "expense"}
         onClose={() => setModal("")}
+        editingExpense={editingExpense}
         expenseForm={expenseForm}
         setExpenseForm={setExpenseForm}
-        onSave={addExpenseItem}
+        onSave={saveExpenseItem}
       />
     </div>
   );
