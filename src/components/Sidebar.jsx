@@ -1,11 +1,16 @@
-import { Leaf, Sparkles, ArrowUpRight, MoreHorizontal } from "lucide-react";
+import { Leaf, Sparkles, ArrowUpRight, LogOut, User, Crown } from "lucide-react";
 
 export default function Sidebar({
   page,
   setPage,
   navigation,
   mobileMenu,
-  setMobileMenu
+  setMobileMenu,
+  user,
+  userPlan,
+  onOpenAuth,
+  onOpenUpgrade,
+  onSignOut
 }) {
   return (
     <>
@@ -23,7 +28,24 @@ export default function Sidebar({
             <span className="brand-icon"><Leaf /></span>
             <span>MealMate</span>
           </div>
-          <span className="brand-plan">FREE</span>
+          <button
+            type="button"
+            className="brand-plan"
+            style={{
+              cursor: "pointer",
+              border: 0,
+              background: userPlan === "PRO" ? "var(--green)" : undefined,
+              color: userPlan === "PRO" ? "#fff" : undefined,
+              display: "flex",
+              alignItems: "center",
+              gap: 3
+            }}
+            onClick={onOpenUpgrade}
+            title="Click to view plan details"
+          >
+            {userPlan === "PRO" && <Crown size={11} />}
+            <span>{userPlan}</span>
+          </button>
         </div>
 
         <div className="nav-group">
@@ -56,20 +78,60 @@ export default function Sidebar({
 
         <div className="sidebar-promo">
           <div className="promo-spark"><Sparkles size={16} /></div>
-          <strong>Daily Nutrition Tip</strong>
-          <p>Meal planning reduces weekly food waste by up to 30% and keeps your budget intact.</p>
-          <button onClick={() => { setPage("Meal Planner"); setMobileMenu(false); }}>
-            Review planner <ArrowUpRight size={13} />
+          <strong>{userPlan === "PRO" ? "Pro Cloud Synchronized" : "MealMate Pro Feature"}</strong>
+          <p>
+            {userPlan === "PRO"
+              ? "All your recipes, meal schedules, and grocery lists are active on your personal cloud."
+              : "Upgrade to sync your nutrition schedules across all your devices in real-time."}
+          </p>
+          <button onClick={onOpenUpgrade}>
+            {userPlan === "PRO" ? "Manage Plan" : "Explore Pro"} <ArrowUpRight size={13} />
           </button>
         </div>
 
+        {/* User Profile / Auth Area */}
         <div className="profile">
-          <div className="avatar">M</div>
+          <div className="avatar">{user ? (user.name ? user.name[0].toUpperCase() : "M") : "G"}</div>
           <div className="profile-copy">
-            <strong>MealMate User</strong>
-            <span>Personal Workspace</span>
+            {user ? (
+              <>
+                <strong>{user.name || "MealMate Member"}</strong>
+                <span title={user.email}>{user.email || "Personal Workspace"}</span>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  style={{ border: 0, background: "none", color: "var(--green)", fontWeight: 700, padding: 0, cursor: "pointer", fontSize: 11, textAlign: "left" }}
+                  onClick={onOpenAuth}
+                >
+                  Sign In / Register
+                </button>
+                <span>Local Workspace</span>
+              </>
+            )}
           </div>
-          <MoreHorizontal size={16} className="profile-more" />
+          {user ? (
+            <button
+              type="button"
+              className="row-action-btn"
+              title="Sign Out"
+              onClick={onSignOut}
+              style={{ width: 28, height: 28 }}
+            >
+              <LogOut size={13} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="row-action-btn"
+              title="Sign in or register"
+              onClick={onOpenAuth}
+              style={{ width: 28, height: 28 }}
+            >
+              <User size={13} />
+            </button>
+          )}
         </div>
       </aside>
     </>

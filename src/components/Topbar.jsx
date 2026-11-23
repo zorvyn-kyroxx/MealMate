@@ -1,4 +1,4 @@
-import { Menu, ChevronRight, Bell, Moon, Sun } from "lucide-react";
+import { Menu, ChevronRight, Bell, Moon, Sun, User as UserIcon } from "lucide-react";
 import { prettyDate } from "../utils/dateUtils";
 
 export default function Topbar({
@@ -6,6 +6,8 @@ export default function Topbar({
   today,
   theme,
   setTheme,
+  user,
+  onOpenAuth,
   mobileMenu,
   setMobileMenu,
   showNotification
@@ -35,11 +37,19 @@ export default function Topbar({
         <button
           className="icon-button"
           title="Quick notification"
-          onClick={() => showNotification("You are making great progress today!")}
+          onClick={() => showNotification("Your food schedule is in sync!")}
         >
           <Bell size={18} />
         </button>
-        <div className="avatar top-avatar">M</div>
+        <button
+          type="button"
+          className="avatar top-avatar"
+          style={{ cursor: "pointer", border: 0 }}
+          title={user ? `${user.name} (${user.email})` : "Click to sign in"}
+          onClick={onOpenAuth}
+        >
+          {user ? (user.name ? user.name[0].toUpperCase() : "M") : <UserIcon size={14} />}
+        </button>
       </div>
     </header>
   );

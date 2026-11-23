@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard, CalendarDays, BookOpen, ShoppingBasket, Wallet,
-  BarChart3, Settings, Sparkles
+  BarChart3, Settings, Crown, Sparkles
 } from "lucide-react";
 import "./App.css";
 
@@ -11,6 +11,11 @@ import {
   today, starterRecipes, initialMeals, initialGroceries, initialExpenses,
   iconForMeal, blankRecipe
 } from "./constants/initialData";
+
+// Supabase Cloud Sync Service
+import {
+  syncUserDataToCloud, fetchUserDataFromCloud, signOutUser
+} from "./services/supabaseClient";
 
 // Components
 import LandingPage from "./components/LandingPage";
@@ -23,6 +28,7 @@ import GroceriesView from "./components/GroceriesView";
 import BudgetView from "./components/BudgetView";
 import AnalyticsView from "./components/AnalyticsView";
 import SettingsView from "./components/SettingsView";
+import PricingView from "./components/PricingView";
 
 // Modals
 import MealModal from "./components/Modals/MealModal";
@@ -30,6 +36,8 @@ import RecipeModal from "./components/Modals/RecipeModal";
 import RecipeDetailModal from "./components/Modals/RecipeDetailModal";
 import GroceryModal from "./components/Modals/GroceryModal";
 import ExpenseModal from "./components/Modals/ExpenseModal";
+import AuthModal from "./components/Modals/AuthModal";
+import UpgradeModal from "./components/Modals/UpgradeModal";
 
 export default function App() {
   const [started, setStarted] = useState(() => readStore("mealmate-started", false));
@@ -37,6 +45,11 @@ export default function App() {
   const [mobileMenu, setMobileMenu] = useState(false);
   const [theme, setTheme] = useState(() => readStore("mealmate-theme", "light"));
 
+  // User session & Plan
+  const [user, setUser] = useState(() => readStore("mealmate-user", null));
+  const [userPlan, setUserPlan] = useState(() => readStore("mealmate-plan", "FREE"));
+
+  // Workspace Data
   const [meals, setMeals] = useState(() => readStore("mealmate-meals", initialMeals));
   const [recipes, setRecipes] = useState(() => readStore("mealmate-recipes", starterRecipes));
   const [groceries, setGroceries] = useState(() => readStore("mealmate-groceries", initialGroceries));
@@ -50,7 +63,7 @@ export default function App() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
 
-  const [modal, setModal] = useState(""); // "meal" | "recipe" | "recipeDetail" | "grocery" | "expense"
+  const [modal, setModal] = useState(""); // "meal" | "recipe" | "recipeDetail" | "grocery" | "expense" | "auth" | "upgrade"
   const [editingMeal, setEditingMeal] = useState(null);
   const [editingRecipe, setEditingRecipe] = useState(null);
   const [editingGrocery, setEditingGrocery] = useState(null);
@@ -82,6 +95,8 @@ export default function App() {
 
   // Sync to LocalStorage
   useEffect(() => localStorage.setItem("mealmate-started", JSON.stringify(started)), [started]);
+  useEffect(() => localStorage.setItem("mealmate-user", JSON.stringify(user)), [user]);
+  useEffect(() => localStorage.setItem("mealmate-plan", JSON.stringify(userPlan)), [userPlan]);
   useEffect(() => localStorage.setItem("mealmate-meals", JSON.stringify(meals)), [meals]);
   useEffect(() => localStorage.setItem("mealmate-recipes", JSON.stringify(recipes)), [recipes]);
   useEffect(() => localStorage.setItem("mealmate-groceries", JSON.stringify(groceries)), [groceries]);
@@ -90,6 +105,14 @@ export default function App() {
   useEffect(() => localStorage.setItem("mealmate-expenses", JSON.stringify(expenses)), [expenses]);
   useEffect(() => localStorage.setItem("mealmate-cal-target", JSON.stringify(calorieTarget)), [calorieTarget]);
   useEffect(() => localStorage.setItem("mealmate-serving-size", JSON.stringify(servingSize)), [servingSize]);
+
+  // Background Cloud Sync when user is authenticated
+  useEffect(() => {
+    if (user && user.id) {
+      const payload = { meals, recipes, groceries, expenses, budget, favorites, calorieTarget, servingSize };
+      syncUserDataToCloud(user.id, payload);
+    }
+  }, [meals, recipes, groceries, expenses, budget, favorites, calorieTarget, servingSize, user]);
 
   // Handle ESC key for closing modals
   useEffect(() => {
@@ -106,6 +129,45 @@ export default function App() {
   const showNotification = (msg) => {
     setNotification(msg);
     setTimeout(() => setNotification(""), 3500);
+  };
+
+  // Auth & Session Handlers
+  const handleLoginSuccess = async (userObj) => {
+    setUser(userObj);
+    if (userObj.plan) setUserPlan(userObj.plan);
+
+    // Try fetching existing cloud state
+    const cloudData = await fetchUserDataFromCloud(userObj.id);
+    if (cloudData) {
+      if (cloudData.meals) setMeals(cloudData.meals);
+      if (cloudData.recipes) setRecipes(cloudData.recipes);
+      if (cloudData.groceries) setGroceries(cloudData.groceries);
+      if (cloudData.expenses) setExpenses(cloudData.expenses);
+      if (cloudData.budget) setBudget(cloudData.budget);
+      showNotification("Restored cloud workspace for " + userObj.name);
+    }
+  };
+
+  const handleSignOut = async () => {
+    await signOutUser();
+    setUser(null);
+    showNotification("Signed out of MealMate workspace.");
+  };
+
+  const handleUpgradeToPro = () => {
+    setUserPlan("PRO");
+    if (user) {
+      setUser({ ...user, plan: "PRO" });
+    }
+    showNotification("🎉 Upgraded to MealMate Pro!");
+  };
+
+  const handleDowngradeToFree = () => {
+    setUserPlan("FREE");
+    if (user) {
+      setUser({ ...user, plan: "FREE" });
+    }
+    showNotification("Switched to Starter Plan.");
   };
 
   // Week computation
@@ -482,6 +544,7 @@ export default function App() {
     { name: "Groceries", icon: ShoppingBasket, count: groceries.filter(g => !g.done).length },
     { name: "Budget", icon: Wallet },
     { name: "Analytics", icon: BarChart3 },
+    { name: "Pricing", icon: Crown },
     { name: "Settings", icon: Settings }
   ];
 
@@ -524,6 +587,11 @@ export default function App() {
         navigation={navigation}
         mobileMenu={mobileMenu}
         setMobileMenu={setMobileMenu}
+        user={user}
+        userPlan={userPlan}
+        onOpenAuth={() => setModal("auth")}
+        onOpenUpgrade={() => setModal("upgrade")}
+        onSignOut={handleSignOut}
       />
 
       {/* Main Area */}
@@ -534,6 +602,8 @@ export default function App() {
           today={today}
           theme={theme}
           setTheme={setTheme}
+          user={user}
+          onOpenAuth={() => setModal("auth")}
           mobileMenu={mobileMenu}
           setMobileMenu={setMobileMenu}
           showNotification={showNotification}
@@ -632,6 +702,15 @@ export default function App() {
             />
           )}
 
+          {page === "Pricing" && (
+            <PricingView
+              userPlan={userPlan}
+              onUpgradeToPro={handleUpgradeToPro}
+              onDowngradeToFree={handleDowngradeToFree}
+              showNotification={showNotification}
+            />
+          )}
+
           {page === "Settings" && (
             <SettingsView
               theme={theme}
@@ -699,6 +778,21 @@ export default function App() {
         expenseForm={expenseForm}
         setExpenseForm={setExpenseForm}
         onSave={saveExpenseItem}
+      />
+
+      <AuthModal
+        isOpen={modal === "auth"}
+        onClose={() => setModal("")}
+        onLoginSuccess={handleLoginSuccess}
+        showNotification={showNotification}
+      />
+
+      <UpgradeModal
+        isOpen={modal === "upgrade"}
+        onClose={() => setModal("")}
+        onUpgradeToPro={handleUpgradeToPro}
+        onNavigateToPricing={() => setPage("Pricing")}
+        showNotification={showNotification}
       />
     </div>
   );
