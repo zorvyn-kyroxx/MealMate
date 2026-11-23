@@ -277,3 +277,294 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Phase 5: Dark Mode Theme & Analytics / Settings */
+body.dark-theme {
+  --green: #6da278;
+  --green-dark: #8fc29b;
+  --green-soft: #202d24;
+  --text: #e6ede8;
+  --muted: #95a398;
+  --border: #2c3c31;
+  --surface: #1c2720;
+  --background: #131c16;
+  --shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
+  background: var(--background);
+  color: var(--text);
+}
+
+body.dark-theme .sidebar,
+body.dark-theme .topbar,
+body.dark-theme .surface-card,
+body.dark-theme .stat-card,
+body.dark-theme .day-card,
+body.dark-theme .recipe-card,
+body.dark-theme .modal,
+body.dark-theme .recipe-detail-modal,
+body.dark-theme .chart-card,
+body.dark-theme .chip,
+body.dark-theme .btn-outline,
+body.dark-theme .search-box,
+body.dark-theme .filter-box,
+body.dark-theme .planner-toolbar,
+body.dark-theme .budget-stat-mini,
+body.dark-theme .analytics-card,
+body.dark-theme .settings-card {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+body.dark-theme .topbar {
+  background: #1c2720ed;
+}
+
+body.dark-theme .nav-link {
+  color: #95a398;
+}
+
+body.dark-theme .nav-link:hover {
+  background: #25332a;
+  color: #cbe3cf;
+}
+
+body.dark-theme .nav-link.active {
+  background: #27382d;
+  color: #7ab887;
+}
+
+body.dark-theme .sidebar-promo,
+body.dark-theme .bottom-insight,
+body.dark-theme .grocery-tip,
+body.dark-theme .budget-note,
+body.dark-theme .budget-primary {
+  background: #222f27;
+  border-color: var(--border);
+}
+
+body.dark-theme .dashboard-hero {
+  background: linear-gradient(105deg, #223027, #1b261f);
+}
+
+body.dark-theme .hero-stamp {
+  background: #202c24f0;
+  border-color: var(--border);
+}
+
+body.dark-theme input,
+body.dark-theme select,
+body.dark-theme textarea {
+  background: #17211a;
+  color: var(--text);
+  border-color: var(--border);
+}
+
+body.dark-theme .planner-meal {
+  background: #202b23;
+  border-color: #27372d;
+}
+
+body.dark-theme .day-card-featured {
+  background: #1e2c22;
+  border-color: #3b5443;
+}
+
+body.dark-theme .meal-list-row,
+body.dark-theme .grocery-row,
+body.dark-theme .expense-row,
+body.dark-theme .settings-item {
+  border-color: #26362b;
+}
+
+body.dark-theme .brand-plan {
+  background: #27372c;
+  color: #8da491;
+}
+
+body.dark-theme .chip:hover:not(.active) {
+  background: #27382d;
+  color: #d1e2d4;
+}
+
+body.dark-theme .row-action-btn,
+body.dark-theme .row-edit,
+body.dark-theme .meal-controls button {
+  background: #27362d;
+  color: #a4b4a7;
+}
+
+body.dark-theme .row-action-btn:hover,
+body.dark-theme .row-edit:hover,
+body.dark-theme .meal-controls button:hover {
+  background: #314438;
+  color: #e3ede5;
+}
+
+body.dark-theme .check-button {
+  background: #1c2720;
+  border-color: #3c4f42;
+}
+
+body.dark-theme .check-button svg {
+  color: #fff;
+}
+
+body.dark-theme .grocery-row.is-done .check-button {
+  background: #52785c;
+  border-color: #52785c;
+}
+
+body.dark-theme .chart-bar-container,
+body.dark-theme .progress-track,
+body.dark-theme .mini-progress,
+body.dark-theme .metric-bar-track {
+  background: #25332a;
+}
+
+/* Analytics & Settings Grid */
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.analytics-card {
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: var(--surface);
+}
+
+.analytics-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.analytics-header h3 {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.analytics-card strong.big-num {
+  font-family: Manrope, sans-serif;
+  font-size: 28px;
+  color: var(--text);
+  display: block;
+}
+
+.analytics-card p {
+  color: var(--muted);
+  font-size: 11px;
+  margin: 6px 0 0;
+}
+
+.metric-bar-group {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.metric-bar-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.metric-bar-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.metric-bar-track {
+  height: 8px;
+  background: #edf1eb;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.metric-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+/* Settings View Styles */
+.settings-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.settings-card {
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.settings-card h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  color: var(--text);
+}
+
+.settings-card p.subtitle {
+  margin: 0 0 20px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.settings-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+}
+
+.settings-item-copy strong {
+  display: block;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.settings-item-copy span {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.theme-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.theme-toggle-btn:hover {
+  background: var(--green-soft);
+  color: var(--green-dark);
+}
+
+@media(max-width: 900px) {
+  .analytics-grid,
+  .settings-layout {
+    grid-template-columns: 1fr;
+  }
+}

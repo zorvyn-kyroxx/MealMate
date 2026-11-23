@@ -1,9 +1,11 @@
-import { Menu, ChevronRight, Bell } from "lucide-react";
+import { Menu, ChevronRight, Bell, Moon, Sun } from "lucide-react";
 import { prettyDate } from "../utils/dateUtils";
 
 export default function Topbar({
   page,
   today,
+  theme,
+  setTheme,
   mobileMenu,
   setMobileMenu,
   showNotification
@@ -23,6 +25,13 @@ export default function Topbar({
           <span className="status-dot" />
           <span>{prettyDate(today, { weekday: "short", day: "numeric", month: "short" })}</span>
         </div>
+        <button
+          className="icon-button"
+          title={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
+          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+        >
+          {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
         <button
           className="icon-button"
           title="Quick notification"

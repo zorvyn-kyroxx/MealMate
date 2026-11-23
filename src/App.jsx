@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  LayoutDashboard, CalendarDays, BookOpen, ShoppingBasket, Wallet, Sparkles
+  LayoutDashboard, CalendarDays, BookOpen, ShoppingBasket, Wallet,
+  BarChart3, Settings, Sparkles
 } from "lucide-react";
 import "./App.css";
 
@@ -20,6 +21,8 @@ import MealPlannerView from "./components/MealPlannerView";
 import RecipesView from "./components/RecipesView";
 import GroceriesView from "./components/GroceriesView";
 import BudgetView from "./components/BudgetView";
+import AnalyticsView from "./components/AnalyticsView";
+import SettingsView from "./components/SettingsView";
 
 // Modals
 import MealModal from "./components/Modals/MealModal";
@@ -32,6 +35,7 @@ export default function App() {
   const [started, setStarted] = useState(() => readStore("mealmate-started", false));
   const [page, setPage] = useState("Dashboard");
   const [mobileMenu, setMobileMenu] = useState(false);
+  const [theme, setTheme] = useState(() => readStore("mealmate-theme", "light"));
 
   const [meals, setMeals] = useState(() => readStore("mealmate-meals", initialMeals));
   const [recipes, setRecipes] = useState(() => readStore("mealmate-recipes", starterRecipes));
@@ -39,6 +43,8 @@ export default function App() {
   const [favorites, setFavorites] = useState(() => readStore("mealmate-favorites", [1, 5]));
   const [budget, setBudget] = useState(() => readStore("mealmate-budget", 8000));
   const [expenses, setExpenses] = useState(() => readStore("mealmate-expenses", initialExpenses));
+  const [calorieTarget, setCalorieTarget] = useState(() => readStore("mealmate-cal-target", 2000));
+  const [servingSize, setServingSize] = useState(() => readStore("mealmate-serving-size", 2));
 
   const [weekStart, setWeekStart] = useState(() => dayStart(today));
   const [search, setSearch] = useState("");
@@ -64,6 +70,16 @@ export default function App() {
   const [expenseForm, setExpenseForm] = useState({ title: "", amount: "", category: "Groceries", date: dateKey(today) });
   const [notification, setNotification] = useState("");
 
+  // Apply and Sync Theme
+  useEffect(() => {
+    if (theme === "dark") {
+      document.body.classList.add("dark-theme");
+    } else {
+      document.body.classList.remove("dark-theme");
+    }
+    localStorage.setItem("mealmate-theme", JSON.stringify(theme));
+  }, [theme]);
+
   // Sync to LocalStorage
   useEffect(() => localStorage.setItem("mealmate-started", JSON.stringify(started)), [started]);
   useEffect(() => localStorage.setItem("mealmate-meals", JSON.stringify(meals)), [meals]);
@@ -72,6 +88,8 @@ export default function App() {
   useEffect(() => localStorage.setItem("mealmate-favorites", JSON.stringify(favorites)), [favorites]);
   useEffect(() => localStorage.setItem("mealmate-budget", JSON.stringify(budget)), [budget]);
   useEffect(() => localStorage.setItem("mealmate-expenses", JSON.stringify(expenses)), [expenses]);
+  useEffect(() => localStorage.setItem("mealmate-cal-target", JSON.stringify(calorieTarget)), [calorieTarget]);
+  useEffect(() => localStorage.setItem("mealmate-serving-size", JSON.stringify(servingSize)), [servingSize]);
 
   // Handle ESC key for closing modals
   useEffect(() => {
@@ -400,12 +418,71 @@ export default function App() {
     showNotification("Expense removed.");
   };
 
+  // Data Export & Backup
+  const exportData = () => {
+    const backup = {
+      mealmate_version: "2.0",
+      export_date: new Date().toISOString(),
+      meals,
+      recipes,
+      groceries,
+      expenses,
+      budget,
+      favorites,
+      calorieTarget,
+      servingSize
+    };
+
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backup, null, 2));
+    const downloadAnchor = document.createElement("a");
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `mealmate-backup-${dateKey(today)}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    showNotification("Backup downloaded successfully!");
+  };
+
+  const importData = (data) => {
+    if (!data || typeof data !== "object") {
+      showNotification("Invalid backup format.");
+      return;
+    }
+
+    if (Array.isArray(data.meals)) setMeals(data.meals);
+    if (Array.isArray(data.recipes)) setRecipes(data.recipes);
+    if (Array.isArray(data.groceries)) setGroceries(data.groceries);
+    if (Array.isArray(data.expenses)) setExpenses(data.expenses);
+    if (typeof data.budget === "number") setBudget(data.budget);
+    if (Array.isArray(data.favorites)) setFavorites(data.favorites);
+    if (typeof data.calorieTarget === "number") setCalorieTarget(data.calorieTarget);
+    if (typeof data.servingSize === "number") setServingSize(data.servingSize);
+
+    showNotification("Workspace data restored successfully!");
+  };
+
+  const resetToDemoData = () => {
+    if (window.confirm("Are you sure you want to restore default demo recipes, meals, and budget?")) {
+      setMeals(initialMeals);
+      setRecipes(starterRecipes);
+      setGroceries(initialGroceries);
+      setExpenses(initialExpenses);
+      setBudget(8000);
+      setFavorites([1, 5]);
+      setCalorieTarget(2000);
+      setServingSize(2);
+      showNotification("Reset to initial demo data.");
+    }
+  };
+
   const navigation = [
     { name: "Dashboard", icon: LayoutDashboard },
     { name: "Meal Planner", icon: CalendarDays },
     { name: "Recipes", icon: BookOpen },
     { name: "Groceries", icon: ShoppingBasket, count: groceries.filter(g => !g.done).length },
-    { name: "Budget", icon: Wallet }
+    { name: "Budget", icon: Wallet },
+    { name: "Analytics", icon: BarChart3 },
+    { name: "Settings", icon: Settings }
   ];
 
   // LANDING PAGE VIEW
@@ -455,6 +532,8 @@ export default function App() {
         <Topbar
           page={page}
           today={today}
+          theme={theme}
+          setTheme={setTheme}
           mobileMenu={mobileMenu}
           setMobileMenu={setMobileMenu}
           showNotification={showNotification}
@@ -539,6 +618,32 @@ export default function App() {
               onDeleteExpense={deleteExpense}
               onOpenExpenseModal={openNewExpense}
               onOpenEditExpense={openEditExpense}
+            />
+          )}
+
+          {page === "Analytics" && (
+            <AnalyticsView
+              meals={meals}
+              recipes={recipes}
+              groceries={groceries}
+              expenses={expenses}
+              budget={budget}
+              totalSpent={totalSpent}
+            />
+          )}
+
+          {page === "Settings" && (
+            <SettingsView
+              theme={theme}
+              setTheme={setTheme}
+              calorieTarget={calorieTarget}
+              setCalorieTarget={setCalorieTarget}
+              servingSize={servingSize}
+              setServingSize={setServingSize}
+              onExportData={exportData}
+              onImportData={importData}
+              onResetData={resetToDemoData}
+              showNotification={showNotification}
             />
           )}
         </div>
