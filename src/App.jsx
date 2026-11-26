@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard, CalendarDays, BookOpen, ShoppingBasket, Wallet,
   BarChart3, Settings, Crown, Sparkles
@@ -17,33 +17,35 @@ import {
   syncUserDataToCloud, fetchUserDataFromCloud, signOutUser
 } from "./services/supabaseClient";
 
-// Components
+// Core Shell & Dashboard (loaded eagerly for instant first paint)
 import LandingPage from "./components/LandingPage";
 import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
 import DashboardView from "./components/DashboardView";
-import MealPlannerView from "./components/MealPlannerView";
-import RecipesView from "./components/RecipesView";
-import GroceriesView from "./components/GroceriesView";
-import BudgetView from "./components/BudgetView";
-import AnalyticsView from "./components/AnalyticsView";
-import SettingsView from "./components/SettingsView";
-import PricingView from "./components/PricingView";
+
+// Secondary Views & Modals (code-split to keep initial bundle fast)
+const MealPlannerView = lazy(() => import("./components/MealPlannerView"));
+const RecipesView = lazy(() => import("./components/RecipesView"));
+const GroceriesView = lazy(() => import("./components/GroceriesView"));
+const BudgetView = lazy(() => import("./components/BudgetView"));
+const AnalyticsView = lazy(() => import("./components/AnalyticsView"));
+const SettingsView = lazy(() => import("./components/SettingsView"));
+const PricingView = lazy(() => import("./components/PricingView"));
 
 // Security & Gating Utilities
 import { checkFeatureAccess } from "./utils/tierLimits";
 import { sanitizeText } from "./utils/security";
 
-// Modals
-import MealModal from "./components/Modals/MealModal";
-import RecipeModal from "./components/Modals/RecipeModal";
-import RecipeDetailModal from "./components/Modals/RecipeDetailModal";
-import GroceryModal from "./components/Modals/GroceryModal";
-import ExpenseModal from "./components/Modals/ExpenseModal";
-import AuthModal from "./components/Modals/AuthModal";
-import UpgradeModal from "./components/Modals/UpgradeModal";
-import LegalModal from "./components/Modals/LegalModal";
-import PaymentModal from "./components/Modals/PaymentModal";
+// Modals (lazy-loaded on demand)
+const MealModal = lazy(() => import("./components/Modals/MealModal"));
+const RecipeModal = lazy(() => import("./components/Modals/RecipeModal"));
+const RecipeDetailModal = lazy(() => import("./components/Modals/RecipeDetailModal"));
+const GroceryModal = lazy(() => import("./components/Modals/GroceryModal"));
+const ExpenseModal = lazy(() => import("./components/Modals/ExpenseModal"));
+const AuthModal = lazy(() => import("./components/Modals/AuthModal"));
+const UpgradeModal = lazy(() => import("./components/Modals/UpgradeModal"));
+const LegalModal = lazy(() => import("./components/Modals/LegalModal"));
+const PaymentModal = lazy(() => import("./components/Modals/PaymentModal"));
 
 export default function App() {
   const [started, setStarted] = useState(() => readStore("mealmate-started", false));
@@ -55,9 +57,15 @@ export default function App() {
   const [user, setUser] = useState(() => readStore("mealmate-user", null));
   const [userPlan, setUserPlan] = useState(() => readStore("mealmate-plan", "FREE"));
 
-  // Legal & Payment Modal States
-  const [legalOpen, setLegalOpen] = useState(false);
-  const [legalTab, setLegalTab] = useState("terms");
+  // Legal & Payment Modal States (auto-open if visiting /privacy or /terms)
+  const initialLegalPath =
+    typeof window !== "undefined" ? window.location.pathname.toLowerCase() : "";
+  const [legalOpen, setLegalOpen] = useState(
+    initialLegalPath === "/privacy" || initialLegalPath === "/terms"
+  );
+  const [legalTab, setLegalTab] = useState(
+    initialLegalPath === "/privacy" ? "privacy" : "terms"
+  );
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [upgradeReason, setUpgradeReason] = useState("");
   const [paymentData, setPaymentData] = useState({
@@ -348,6 +356,13 @@ export default function App() {
   };
 
   const addRecipeToPlan = (recipe) => {
+    const access = checkFeatureAccess("add_meal", userPlan, meals.length);
+    if (!access.allowed) {
+      setUpgradeReason(access.reason);
+      setModal("upgrade");
+      return;
+    }
+    setUpgradeReason("");
     setEditingMeal(null);
     setMealForm({
       date: dateKey(today),
@@ -360,17 +375,71 @@ export default function App() {
     setModal("meal");
   };
 
+  const mergeIngredientsIntoGroceries = (ingredientNames) => {
+    const existingNames = new Set(groceries.map((g) => g.name.trim().toLowerCase()));
+    const uniqueToAdd = [];
+
+    ingredientNames.forEach((raw) => {
+      const clean = sanitizeText(String(raw).trim());
+      if (!clean) return;
+      const key = clean.toLowerCase();
+      if (!existingNames.has(key)) {
+        existingNames.add(key);
+        uniqueToAdd.push({
+          id: Date.now() + uniqueToAdd.length,
+          name: clean,
+          amount: "1 portion",
+          category: "Produce",
+          done: false
+        });
+      }
+    });
+
+    if (uniqueToAdd.length > 0) {
+      setGroceries((prev) => [...prev, ...uniqueToAdd]);
+    }
+    return uniqueToAdd.length;
+  };
+
   const addIngredientsToGroceries = (recipe) => {
     if (!recipe.ingredients || recipe.ingredients.length === 0) return;
-    const newItems = recipe.ingredients.map((ing, i) => ({
-      id: Date.now() + i,
-      name: ing,
-      amount: "1 portion",
-      category: "Produce",
-      done: false
-    }));
-    setGroceries((prev) => [...prev, ...newItems]);
-    showNotification(`Added ${newItems.length} ingredients to your grocery checklist!`);
+    const addedCount = mergeIngredientsIntoGroceries(recipe.ingredients);
+    if (addedCount > 0) {
+      showNotification(`Added ${addedCount} new ingredients to your grocery checklist!`);
+    } else {
+      showNotification("Those ingredients are already in your grocery checklist.");
+    }
+  };
+
+  const syncWeekToGroceries = () => {
+    if (weekMeals.length === 0) {
+      showNotification("No meals scheduled for this week yet.");
+      return;
+    }
+
+    const matchedIngredients = [];
+    weekMeals.forEach((meal) => {
+      const matchedRecipe = recipes.find(
+        (r) =>
+          (meal.recipeId && String(r.id) === String(meal.recipeId)) ||
+          r.title.trim().toLowerCase() === meal.title.trim().toLowerCase()
+      );
+      if (matchedRecipe?.ingredients?.length) {
+        matchedIngredients.push(...matchedRecipe.ingredients);
+      }
+    });
+
+    if (matchedIngredients.length === 0) {
+      showNotification("Link meals from your Recipe Library to auto-sync ingredients.");
+      return;
+    }
+
+    const addedCount = mergeIngredientsIntoGroceries(matchedIngredients);
+    if (addedCount > 0) {
+      showNotification(`Synced ${addedCount} ingredients from this week's meals!`);
+    } else {
+      showNotification("All ingredients for this week are already in your grocery list.");
+    }
   };
 
   const openNewRecipe = () => {
@@ -616,7 +685,19 @@ export default function App() {
 
   // LANDING PAGE VIEW
   if (!started) {
-    return <LandingPage onStart={() => setStarted(true)} onOpenLegal={openLegalModal} />;
+    return (
+      <>
+        <LandingPage onStart={() => setStarted(true)} onOpenLegal={openLegalModal} />
+        <Suspense fallback={null}>
+          <LegalModal
+            key={legalOpen ? legalTab : "legal-closed"}
+            isOpen={legalOpen}
+            onClose={() => setLegalOpen(false)}
+            initialTab={legalTab}
+          />
+        </Suspense>
+      </>
+    );
   }
 
   // APP SHELL VIEW
@@ -698,20 +779,22 @@ export default function App() {
             />
           )}
 
-          {page === "Meal Planner" && (
-            <MealPlannerView
-              weekDays={weekDays}
-              todayKey={todayKey}
-              weekRangeLabel={weekRangeLabel}
-              meals={meals}
-              onPrevWeek={prevWeek}
-              onNextWeek={nextWeek}
-              onResetToThisWeek={resetToThisWeek}
-              onOpenNewMeal={openNewMeal}
-              onOpenEditMeal={openEditMeal}
-              onDeleteMeal={deleteMeal}
-            />
-          )}
+          <Suspense fallback={<div className="empty-state"><p>Loading view...</p></div>}>
+            {page === "Meal Planner" && (
+              <MealPlannerView
+                weekDays={weekDays}
+                todayKey={todayKey}
+                weekRangeLabel={weekRangeLabel}
+                meals={meals}
+                onPrevWeek={prevWeek}
+                onNextWeek={nextWeek}
+                onResetToThisWeek={resetToThisWeek}
+                onOpenNewMeal={openNewMeal}
+                onOpenEditMeal={openEditMeal}
+                onDeleteMeal={deleteMeal}
+                onSyncWeekToGroceries={syncWeekToGroceries}
+              />
+            )}
 
           {page === "Recipes" && (
             <RecipesView
@@ -792,6 +875,7 @@ export default function App() {
               showNotification={showNotification}
             />
           )}
+          </Suspense>
         </div>
 
         {/* Footer */}
@@ -819,85 +903,89 @@ export default function App() {
       </main>
 
       {/* Modals */}
-      <MealModal
-        isOpen={modal === "meal"}
-        onClose={() => setModal("")}
-        editingMeal={editingMeal}
-        mealForm={mealForm}
-        setMealForm={setMealForm}
-        onSave={saveMeal}
-      />
+      <Suspense fallback={null}>
+        <MealModal
+          isOpen={modal === "meal"}
+          onClose={() => setModal("")}
+          editingMeal={editingMeal}
+          mealForm={mealForm}
+          setMealForm={setMealForm}
+          onSave={saveMeal}
+        />
 
-      <RecipeModal
-        isOpen={modal === "recipe"}
-        onClose={() => setModal("")}
-        editingRecipe={editingRecipe}
-        recipeForm={recipeForm}
-        setRecipeForm={setRecipeForm}
-        onSave={saveRecipe}
-      />
+        <RecipeModal
+          isOpen={modal === "recipe"}
+          onClose={() => setModal("")}
+          editingRecipe={editingRecipe}
+          recipeForm={recipeForm}
+          setRecipeForm={setRecipeForm}
+          onSave={saveRecipe}
+        />
 
-      <RecipeDetailModal
-        isOpen={modal === "recipeDetail"}
-        onClose={() => setModal("")}
-        selectedRecipe={selectedRecipe}
-        onAddIngredientsToGroceries={addIngredientsToGroceries}
-        onAddRecipeToPlan={addRecipeToPlan}
-        onDeleteRecipe={deleteRecipe}
-      />
+        <RecipeDetailModal
+          isOpen={modal === "recipeDetail"}
+          onClose={() => setModal("")}
+          selectedRecipe={selectedRecipe}
+          onAddIngredientsToGroceries={addIngredientsToGroceries}
+          onAddRecipeToPlan={addRecipeToPlan}
+          onDeleteRecipe={deleteRecipe}
+        />
 
-      <GroceryModal
-        isOpen={modal === "grocery"}
-        onClose={() => setModal("")}
-        editingGrocery={editingGrocery}
-        groceryForm={groceryForm}
-        setGroceryForm={setGroceryForm}
-        onSave={saveGroceryItem}
-      />
+        <GroceryModal
+          isOpen={modal === "grocery"}
+          onClose={() => setModal("")}
+          editingGrocery={editingGrocery}
+          groceryForm={groceryForm}
+          setGroceryForm={setGroceryForm}
+          onSave={saveGroceryItem}
+        />
 
-      <ExpenseModal
-        isOpen={modal === "expense"}
-        onClose={() => setModal("")}
-        editingExpense={editingExpense}
-        expenseForm={expenseForm}
-        setExpenseForm={setExpenseForm}
-        onSave={saveExpenseItem}
-      />
+        <ExpenseModal
+          isOpen={modal === "expense"}
+          onClose={() => setModal("")}
+          editingExpense={editingExpense}
+          expenseForm={expenseForm}
+          setExpenseForm={setExpenseForm}
+          onSave={saveExpenseItem}
+        />
 
-      <AuthModal
-        isOpen={modal === "auth"}
-        onClose={() => setModal("")}
-        onLoginSuccess={handleLoginSuccess}
-        showNotification={showNotification}
-      />
+        <AuthModal
+          isOpen={modal === "auth"}
+          onClose={() => setModal("")}
+          onLoginSuccess={handleLoginSuccess}
+          showNotification={showNotification}
+        />
 
-      <UpgradeModal
-        isOpen={modal === "upgrade"}
-        onClose={() => setModal("")}
-        onUpgradeToPro={handleUpgradeToPro}
-        onOpenPayment={openPaymentModal}
-        upgradeReason={upgradeReason}
-        onNavigateToPricing={() => setPage("Pricing")}
-        showNotification={showNotification}
-      />
+        <UpgradeModal
+          isOpen={modal === "upgrade"}
+          onClose={() => setModal("")}
+          onUpgradeToPro={handleUpgradeToPro}
+          onOpenPayment={openPaymentModal}
+          upgradeReason={upgradeReason}
+          onNavigateToPricing={() => setPage("Pricing")}
+          showNotification={showNotification}
+        />
 
-      <LegalModal
-        isOpen={legalOpen}
-        onClose={() => setLegalOpen(false)}
-        initialTab={legalTab}
-      />
+        <LegalModal
+          key={legalOpen ? legalTab : "legal-closed"}
+          isOpen={legalOpen}
+          onClose={() => setLegalOpen(false)}
+          initialTab={legalTab}
+        />
 
-      <PaymentModal
-        isOpen={paymentOpen}
-        onClose={() => setPaymentOpen(false)}
-        planName={paymentData.planName}
-        billingCycle={paymentData.billingCycle}
-        amount={paymentData.amount}
-        userEmail={user?.email || "user@mealmate.app"}
-        userName={user?.name || "MealMate User"}
-        onPaymentSuccess={handlePaymentSuccess}
-        showNotification={showNotification}
-      />
+        <PaymentModal
+          key={paymentOpen ? `${paymentData.billingCycle}-${paymentData.amount}` : "payment-closed"}
+          isOpen={paymentOpen}
+          onClose={() => setPaymentOpen(false)}
+          planName={paymentData.planName}
+          billingCycle={paymentData.billingCycle}
+          amount={paymentData.amount}
+          userEmail={user?.email || "user@mealmate.app"}
+          userName={user?.name || "MealMate User"}
+          onPaymentSuccess={handlePaymentSuccess}
+          showNotification={showNotification}
+        />
+      </Suspense>
     </div>
   );
 }

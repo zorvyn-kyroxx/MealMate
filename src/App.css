@@ -562,8 +562,31 @@ body.dark-theme .metric-bar-track {
   color: var(--green-dark);
 }
 
+.analytics-details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.pricing-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  max-width: 950px;
+  margin: 0 auto 40px;
+}
+
+.faq-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
 @media(max-width: 900px) {
   .analytics-grid,
+  .analytics-details-grid,
+  .pricing-grid,
+  .faq-grid,
   .settings-layout {
     grid-template-columns: 1fr;
   }

@@ -1,8 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 
-// Retrieve environment variables
+// Retrieve environment variables (accept both standard anon and publishable key names)
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseAnonKey =
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 // Check if valid credentials are provided
 export const isSupabaseConfigured = Boolean(

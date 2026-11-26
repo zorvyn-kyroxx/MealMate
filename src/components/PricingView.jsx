@@ -103,13 +103,7 @@ export default function PricingView({
       </div>
 
       {/* Pricing Cards Grid */}
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "1fr 1fr",
-        gap: 24,
-        maxWidth: 950,
-        margin: "0 auto 40px"
-      }}>
+      <div className="pricing-grid">
         {/* FREE TIER */}
         <div className="surface-card" style={{
           padding: 32,
@@ -211,10 +205,10 @@ export default function PricingView({
 
             <div style={{ margin: "24px 0" }}>
               <strong style={{ fontSize: 36, fontFamily: "Manrope, sans-serif", color: "var(--text)" }}>
-                {isAnnual ? "₹199" : "₹249"}
+                {isAnnual ? "₹167" : "₹249"}
               </strong>
               <span style={{ fontSize: 12, color: "var(--muted)", marginLeft: 6 }}>
-                / month {isAnnual ? "(billed ₹2,388/yr)" : ""}
+                / month {isAnnual ? "(billed ₹1,999/yr)" : ""}
               </span>
             </div>
 
@@ -271,7 +265,7 @@ export default function PricingView({
           <HelpCircle size={18} className="sparkle-mark" />
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+        <div className="faq-grid">
           <div>
             <strong style={{ fontSize: 12, color: "var(--text)", display: "block" }}>
               Can I switch plans anytime?

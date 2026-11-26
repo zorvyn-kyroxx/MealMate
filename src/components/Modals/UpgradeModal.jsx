@@ -99,7 +99,7 @@ export default function UpgradeModal({
             style={{ flex: 1, justifyContent: "center" }}
             onClick={handlePayClick}
           >
-            <Zap size={16} /> Upgrade to Pro (₹199/mo)
+            <Zap size={16} /> Upgrade to Pro (₹1,999/yr)
           </button>
           <button
             className="btn-outline"

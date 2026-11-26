@@ -1,4 +1,4 @@
-import { Plus, ChevronLeft, ChevronRight, Clock3, Pencil, Trash2 } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Clock3, Pencil, Trash2, ShoppingBasket } from "lucide-react";
 import { dateKey, prettyDate } from "../utils/dateUtils";
 
 export default function MealPlannerView({
@@ -11,7 +11,8 @@ export default function MealPlannerView({
   onResetToThisWeek,
   onOpenNewMeal,
   onOpenEditMeal,
-  onDeleteMeal
+  onDeleteMeal,
+  onSyncWeekToGroceries
 }) {
   return (
     <>
@@ -24,9 +25,14 @@ export default function MealPlannerView({
           <h1>Weekly Planner</h1>
           <p>Organise breakfast, lunch, and dinner with effortless day-to-day scheduling.</p>
         </div>
-        <button className="btn btn-green" onClick={() => onOpenNewMeal(todayKey)}>
-          <Plus size={17} /> Add meal
-        </button>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button className="btn-outline" onClick={onSyncWeekToGroceries}>
+            <ShoppingBasket size={16} /> Sync week to groceries
+          </button>
+          <button className="btn btn-green" onClick={() => onOpenNewMeal(todayKey)}>
+            <Plus size={17} /> Add meal
+          </button>
+        </div>
       </div>
 
       {/* Week Navigation Toolbar */}
