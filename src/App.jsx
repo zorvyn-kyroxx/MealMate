@@ -30,6 +30,10 @@ import AnalyticsView from "./components/AnalyticsView";
 import SettingsView from "./components/SettingsView";
 import PricingView from "./components/PricingView";
 
+// Security & Gating Utilities
+import { checkFeatureAccess } from "./utils/tierLimits";
+import { sanitizeText } from "./utils/security";
+
 // Modals
 import MealModal from "./components/Modals/MealModal";
 import RecipeModal from "./components/Modals/RecipeModal";
@@ -38,6 +42,8 @@ import GroceryModal from "./components/Modals/GroceryModal";
 import ExpenseModal from "./components/Modals/ExpenseModal";
 import AuthModal from "./components/Modals/AuthModal";
 import UpgradeModal from "./components/Modals/UpgradeModal";
+import LegalModal from "./components/Modals/LegalModal";
+import PaymentModal from "./components/Modals/PaymentModal";
 
 export default function App() {
   const [started, setStarted] = useState(() => readStore("mealmate-started", false));
@@ -48,6 +54,17 @@ export default function App() {
   // User session & Plan
   const [user, setUser] = useState(() => readStore("mealmate-user", null));
   const [userPlan, setUserPlan] = useState(() => readStore("mealmate-plan", "FREE"));
+
+  // Legal & Payment Modal States
+  const [legalOpen, setLegalOpen] = useState(false);
+  const [legalTab, setLegalTab] = useState("terms");
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState("");
+  const [paymentData, setPaymentData] = useState({
+    amount: 1999,
+    billingCycle: "annual",
+    planName: "MealMate Pro"
+  });
 
   // Workspace Data
   const [meals, setMeals] = useState(() => readStore("mealmate-meals", initialMeals));
@@ -170,6 +187,35 @@ export default function App() {
     showNotification("Switched to Starter Plan.");
   };
 
+  const openLegalModal = (tab = "terms") => {
+    setLegalTab(tab);
+    setLegalOpen(true);
+  };
+
+  const openPaymentModal = (details) => {
+    if (details) {
+      setPaymentData({
+        amount: details.amount || 1999,
+        billingCycle: details.billingCycle || "annual",
+        planName: details.planName || "MealMate Pro"
+      });
+    }
+    setPaymentOpen(true);
+  };
+
+  const handlePaymentSuccess = (receipt) => {
+    setUserPlan("PRO");
+    if (user) {
+      setUser({ ...user, plan: "PRO" });
+    }
+    try {
+      const existingHistory = JSON.parse(localStorage.getItem("mealmate-payments") || "[]");
+      localStorage.setItem("mealmate-payments", JSON.stringify([receipt, ...existingHistory]));
+    } catch {
+      // ignore
+    }
+  };
+
   // Week computation
   const weekDays = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => {
@@ -225,6 +271,13 @@ export default function App() {
 
   // Meal Handlers
   const openNewMeal = (defaultDate = todayKey) => {
+    const access = checkFeatureAccess("add_meal", userPlan, meals.length);
+    if (!access.allowed) {
+      setUpgradeReason(access.reason);
+      setModal("upgrade");
+      return;
+    }
+    setUpgradeReason("");
     setEditingMeal(null);
     setMealForm({
       date: defaultDate,
@@ -252,13 +305,14 @@ export default function App() {
 
   const saveMeal = (e) => {
     e.preventDefault();
-    if (!mealForm.title.trim()) return;
+    const cleanTitle = sanitizeText(mealForm.title.trim());
+    if (!cleanTitle) return;
 
     if (editingMeal) {
       setMeals((prev) =>
         prev.map((m) =>
           m.id === editingMeal.id
-            ? { ...m, ...mealForm, calories: Number(mealForm.calories) || 0 }
+            ? { ...m, ...mealForm, title: cleanTitle, calories: Number(mealForm.calories) || 0 }
             : m
         )
       );
@@ -267,6 +321,7 @@ export default function App() {
       const newMeal = {
         id: Date.now(),
         ...mealForm,
+        title: cleanTitle,
         calories: Number(mealForm.calories) || 0
       };
       setMeals((prev) => [...prev, newMeal]);
@@ -319,6 +374,13 @@ export default function App() {
   };
 
   const openNewRecipe = () => {
+    const access = checkFeatureAccess("add_recipe", userPlan, recipes.length);
+    if (!access.allowed) {
+      setUpgradeReason(access.reason);
+      setModal("upgrade");
+      return;
+    }
+    setUpgradeReason("");
     setEditingRecipe(null);
     setRecipeForm(blankRecipe);
     setModal("recipe");
@@ -326,23 +388,24 @@ export default function App() {
 
   const saveRecipe = (e) => {
     e.preventDefault();
-    if (!recipeForm.title.trim()) return;
+    const cleanTitle = sanitizeText(recipeForm.title.trim());
+    if (!cleanTitle) return;
 
     const ingList = typeof recipeForm.ingredients === "string"
-      ? recipeForm.ingredients.split("\n").map(s => s.trim()).filter(Boolean)
-      : recipeForm.ingredients;
+      ? recipeForm.ingredients.split("\n").map(s => sanitizeText(s.trim())).filter(Boolean)
+      : recipeForm.ingredients.map(s => sanitizeText(s));
 
     const instList = typeof recipeForm.instructions === "string"
-      ? recipeForm.instructions.split("\n").map(s => s.trim()).filter(Boolean)
-      : recipeForm.instructions;
+      ? recipeForm.instructions.split("\n").map(s => sanitizeText(s.trim())).filter(Boolean)
+      : recipeForm.instructions.map(s => sanitizeText(s));
 
     const payload = {
-      title: recipeForm.title.trim(),
+      title: cleanTitle,
       category: recipeForm.category,
       time: Number(recipeForm.time) || 15,
       calories: Number(recipeForm.calories) || 300,
       servings: Number(recipeForm.servings) || 1,
-      description: recipeForm.description.trim() || "A delicious homemade recipe.",
+      description: sanitizeText(recipeForm.description.trim()) || "A delicious homemade recipe.",
       image: recipeForm.image.trim() || "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=900",
       ingredients: ingList.length ? ingList : ["Fresh ingredients"],
       instructions: instList.length ? instList : ["Prepare and enjoy!"]
@@ -378,13 +441,15 @@ export default function App() {
 
   const saveGroceryItem = (e) => {
     e.preventDefault();
-    if (!groceryForm.name.trim()) return;
+    const cleanName = sanitizeText(groceryForm.name.trim());
+    const cleanAmt = sanitizeText(groceryForm.amount.trim()) || "1 item";
+    if (!cleanName) return;
 
     if (editingGrocery) {
       setGroceries((prev) =>
         prev.map((g) =>
           g.id === editingGrocery.id
-            ? { ...g, name: groceryForm.name.trim(), amount: groceryForm.amount.trim() || "1 item", category: groceryForm.category }
+            ? { ...g, name: cleanName, amount: cleanAmt, category: groceryForm.category }
             : g
         )
       );
@@ -392,8 +457,8 @@ export default function App() {
     } else {
       const newItem = {
         id: Date.now(),
-        name: groceryForm.name.trim(),
-        amount: groceryForm.amount.trim() || "1 item",
+        name: cleanName,
+        amount: cleanAmt,
         category: groceryForm.category || "Produce",
         done: false
       };
@@ -441,8 +506,9 @@ export default function App() {
 
   const saveExpenseItem = (e) => {
     e.preventDefault();
+    const cleanTitle = sanitizeText(expenseForm.title.trim());
     const amt = Number(expenseForm.amount);
-    if (!expenseForm.title.trim() || amt <= 0) return;
+    if (!cleanTitle || amt <= 0) return;
 
     if (editingExpense) {
       setExpenses((prev) =>
@@ -450,7 +516,7 @@ export default function App() {
           exp.id === editingExpense.id
             ? {
                 ...exp,
-                title: expenseForm.title.trim(),
+                title: cleanTitle,
                 amount: amt,
                 category: expenseForm.category || "Groceries",
                 date: expenseForm.date || dateKey(today)
@@ -462,7 +528,7 @@ export default function App() {
     } else {
       const newExp = {
         id: Date.now(),
-        title: expenseForm.title.trim(),
+        title: cleanTitle,
         amount: amt,
         category: expenseForm.category || "Groceries",
         date: expenseForm.date || dateKey(today)
@@ -550,7 +616,7 @@ export default function App() {
 
   // LANDING PAGE VIEW
   if (!started) {
-    return <LandingPage onStart={() => setStarted(true)} />;
+    return <LandingPage onStart={() => setStarted(true)} onOpenLegal={openLegalModal} />;
   }
 
   // APP SHELL VIEW
@@ -707,6 +773,7 @@ export default function App() {
               userPlan={userPlan}
               onUpgradeToPro={handleUpgradeToPro}
               onDowngradeToFree={handleDowngradeToFree}
+              onOpenPayment={openPaymentModal}
               showNotification={showNotification}
             />
           )}
@@ -728,8 +795,25 @@ export default function App() {
         </div>
 
         {/* Footer */}
-        <footer className="app-footer">
+        <footer className="app-footer" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
           <span>MealMate © 2026 · Eat better. Live brighter.</span>
+          <div style={{ display: "flex", gap: 14, fontSize: 11 }}>
+            <button
+              type="button"
+              style={{ border: 0, background: "none", color: "inherit", cursor: "pointer", textDecoration: "underline", padding: 0 }}
+              onClick={() => openLegalModal("terms")}
+            >
+              Terms of Service
+            </button>
+            <span>·</span>
+            <button
+              type="button"
+              style={{ border: 0, background: "none", color: "inherit", cursor: "pointer", textDecoration: "underline", padding: 0 }}
+              onClick={() => openLegalModal("privacy")}
+            >
+              Privacy Policy
+            </button>
+          </div>
           <span>Made with care <b>♥</b> for healthy living.</span>
         </footer>
       </main>
@@ -791,7 +875,27 @@ export default function App() {
         isOpen={modal === "upgrade"}
         onClose={() => setModal("")}
         onUpgradeToPro={handleUpgradeToPro}
+        onOpenPayment={openPaymentModal}
+        upgradeReason={upgradeReason}
         onNavigateToPricing={() => setPage("Pricing")}
+        showNotification={showNotification}
+      />
+
+      <LegalModal
+        isOpen={legalOpen}
+        onClose={() => setLegalOpen(false)}
+        initialTab={legalTab}
+      />
+
+      <PaymentModal
+        isOpen={paymentOpen}
+        onClose={() => setPaymentOpen(false)}
+        planName={paymentData.planName}
+        billingCycle={paymentData.billingCycle}
+        amount={paymentData.amount}
+        userEmail={user?.email || "user@mealmate.app"}
+        userName={user?.name || "MealMate User"}
+        onPaymentSuccess={handlePaymentSuccess}
         showNotification={showNotification}
       />
     </div>

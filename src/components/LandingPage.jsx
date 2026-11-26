@@ -1,7 +1,7 @@
 import { Leaf, ArrowUpRight, Sparkles, CalendarCheck, Check, CalendarDays, ChefHat, CircleDollarSign } from "lucide-react";
 import heroImg from "../assets/hero.png";
 
-export default function LandingPage({ onStart }) {
+export default function LandingPage({ onStart, onOpenLegal }) {
   return (
     <main className="landing">
       <nav className="landing-nav">
@@ -98,7 +98,23 @@ export default function LandingPage({ onStart }) {
 
       <footer className="landing-footer">
         <span>© 2026 MealMate · Eat better. Live brighter.</span>
-        <span>Crafted with care for mindful living.</span>
+        <div style={{ display: "flex", gap: 14 }}>
+          <button
+            type="button"
+            style={{ border: 0, background: "none", color: "inherit", cursor: "pointer", fontSize: 10, textDecoration: "underline", padding: 0 }}
+            onClick={() => onOpenLegal("terms")}
+          >
+            Terms of Service
+          </button>
+          <span>·</span>
+          <button
+            type="button"
+            style={{ border: 0, background: "none", color: "inherit", cursor: "pointer", fontSize: 10, textDecoration: "underline", padding: 0 }}
+            onClick={() => onOpenLegal("privacy")}
+          >
+            Privacy Policy
+          </button>
+        </div>
       </footer>
     </main>
   );

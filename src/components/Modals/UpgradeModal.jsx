@@ -1,17 +1,31 @@
-import { X, Crown, Check, Zap } from "lucide-react";
+import { X, Crown, Check, Zap, AlertTriangle } from "lucide-react";
 
 export default function UpgradeModal({
   isOpen,
   onClose,
   onUpgradeToPro,
+  onOpenPayment,
   onNavigateToPricing,
-  showNotification
+  upgradeReason = ""
 }) {
   if (!isOpen) return null;
 
+  const handlePayClick = () => {
+    onClose();
+    if (onOpenPayment) {
+      onOpenPayment({
+        planName: "MealMate Pro",
+        billingCycle: "annual",
+        amount: 1999
+      });
+    } else {
+      onUpgradeToPro();
+    }
+  };
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 440, padding: 28 }}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 460, padding: 28 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{
@@ -33,8 +47,27 @@ export default function UpgradeModal({
           <button type="button" onClick={onClose}><X size={18} /></button>
         </div>
 
+        {upgradeReason && (
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "10px 14px",
+            background: "#fff9db",
+            border: "1px solid #ffe066",
+            borderRadius: 10,
+            color: "#856404",
+            fontSize: 11,
+            fontWeight: 600,
+            marginBottom: 16
+          }}>
+            <AlertTriangle size={18} style={{ flexShrink: 0 }} />
+            <span>{upgradeReason}</span>
+          </div>
+        )}
+
         <p style={{ margin: "0 0 18px", fontSize: 11, color: "var(--muted)", lineHeight: 1.6 }}>
-          Take complete control of your nutrition with cloud synchronization across all your devices and multi-category financial intelligence.
+          Take complete control of your nutrition with cloud synchronization across all your devices, unlimited recipes, and multi-category financial intelligence.
         </p>
 
         <div style={{
@@ -64,13 +97,9 @@ export default function UpgradeModal({
           <button
             className="btn btn-green"
             style={{ flex: 1, justifyContent: "center" }}
-            onClick={() => {
-              onUpgradeToPro();
-              onClose();
-              showNotification("🎉 Upgraded to MealMate Pro!");
-            }}
+            onClick={handlePayClick}
           >
-            <Zap size={16} /> Upgrade to Pro
+            <Zap size={16} /> Upgrade to Pro (₹199/mo)
           </button>
           <button
             className="btn-outline"
@@ -79,7 +108,7 @@ export default function UpgradeModal({
               onNavigateToPricing();
             }}
           >
-            View Plans
+            Compare Plans
           </button>
         </div>
       </div>

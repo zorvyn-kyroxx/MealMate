@@ -5,6 +5,7 @@ export default function PricingView({
   userPlan,
   onUpgradeToPro,
   onDowngradeToFree,
+  onOpenPayment,
   showNotification
 }) {
   const [isAnnual, setIsAnnual] = useState(true);
@@ -241,8 +242,16 @@ export default function PricingView({
                 className="btn btn-green hero-btn"
                 style={{ width: "100%", justifyContent: "center" }}
                 onClick={() => {
-                  onUpgradeToPro();
-                  showNotification("🎉 Welcome to MealMate Pro!");
+                  if (onOpenPayment) {
+                    onOpenPayment({
+                      amount: isAnnual ? 1999 : 249,
+                      billingCycle: isAnnual ? "annual" : "monthly",
+                      planName: "MealMate Pro"
+                    });
+                  } else {
+                    onUpgradeToPro();
+                    showNotification("🎉 Welcome to MealMate Pro!");
+                  }
                 }}
               >
                 <Zap size={16} /> Upgrade to MealMate Pro
