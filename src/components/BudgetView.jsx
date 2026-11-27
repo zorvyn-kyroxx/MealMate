@@ -61,7 +61,7 @@ export default function BudgetView({
             <span>YOUR MONEY, ORGANISED</span>
           </div>
           <h1>Food Budget Tracker</h1>
-          <p>Monitor your weekly and monthly food spending to eat well without breaking the bank.</p>
+          <p>Track food spending against a monthly target. Older transactions remain in your backup.</p>
         </div>
         <button className="btn btn-green" onClick={onOpenExpenseModal}>
           <Plus size={17} /> Add expense
@@ -90,7 +90,7 @@ export default function BudgetView({
           <div className="budget-stat">
             <div className="budget-stat-icon peach"><CircleDollarSign size={18} /></div>
             <div>
-              <small>TOTAL RECORDED SPEND</small>
+              <small>SPEND THIS MONTH</small>
               <strong>₹{totalSpent.toLocaleString("en-IN")}</strong>
             </div>
           </div>
@@ -111,7 +111,7 @@ export default function BudgetView({
             <div className="progress-track">
               <div
                 style={{
-                  width: `${budgetPercent}%`,
+                  width: `${Math.min(100, budgetPercent)}%`,
                   background: totalSpent > budget ? "#c56f70" : undefined
                 }}
               />
@@ -220,7 +220,7 @@ export default function BudgetView({
               <Wallet size={36} style={{ margin: "0 auto 12px", opacity: 0.3 }} />
               <p>
                 {expenses.length === 0
-                  ? "No expenses recorded yet. Log your first expenditure."
+                ? "No expenses recorded this month. Log your first expenditure."
                   : `No expenses logged under "${selectedCategory}".`}
               </p>
               <button className="btn btn-green" onClick={onOpenExpenseModal} style={{ marginTop: 10 }}>
@@ -273,7 +273,7 @@ export default function BudgetView({
           <div className="note-icon"><Sparkles size={18} /></div>
           <h3>Smart Budgeting Tip</h3>
           <p>
-            Planning meals 3–4 days in advance directly lowers last-minute food delivery orders, which on average account for 40% of unnecessary food expenses.
+            Planning meals ahead can help you make a grocery list before shopping. Track receipts to compare your actual spending with your monthly target.
           </p>
         </div>
       </div>

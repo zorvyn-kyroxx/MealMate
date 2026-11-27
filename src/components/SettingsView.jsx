@@ -42,7 +42,7 @@ export default function SettingsView({
             <span>CUSTOMISE YOUR WORKSPACE</span>
           </div>
           <h1>Settings & Preferences</h1>
-          <p>Personalize your theme, set daily nutrition goals, manage your profile, and export or restore your data.</p>
+          <p>Personalize your theme, choose optional nutrition references, and export or restore your data.</p>
         </div>
       </div>
 
@@ -71,17 +71,18 @@ export default function SettingsView({
           <div className="settings-item">
             <div className="settings-item-copy">
               <strong>Target Daily Energy</strong>
-              <span>Target calorie allowance per day (kcal)</span>
+              <span>Optional self-selected reference; leave blank to turn it off</span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <input
                 type="number"
-                min="1000"
-                max="5000"
-                step="50"
-                value={calorieTarget}
-                onChange={(e) => setCalorieTarget(Number(e.target.value) || 2000)}
+                min="1"
+                max="10000"
+                step="1"
+                value={calorieTarget ?? ""}
+                onChange={(e) => setCalorieTarget(e.target.value === "" ? null : Number(e.target.value))}
                 style={{ width: 100, textAlign: "right" }}
+                aria-label="Optional daily calorie reference in kilocalories"
               />
               <span style={{ fontSize: 11, color: "var(--muted)" }}>kcal</span>
             </div>
@@ -129,7 +130,7 @@ export default function SettingsView({
           <div className="settings-item">
             <div className="settings-item-copy">
               <strong>Export Backup (JSON)</strong>
-              <span>Download all meals, recipes, groceries, and expenses</span>
+              <span>Download your meals, recipes, groceries, expenses, and nutrition log</span>
             </div>
             <button className="btn-outline" onClick={onExportData}>
               <Download size={15} /> Export
@@ -185,7 +186,7 @@ export default function SettingsView({
                 100% Client-Side Privacy
               </strong>
               <p style={{ margin: "4px 0 0", fontSize: 10, color: "var(--muted)", lineHeight: 1.6 }}>
-                Your data is stored locally in your browser’s LocalStorage. No third party or server has access to your personal food schedule.
+                Nutrition history and optional profile references stay in this browser’s LocalStorage. If you sign in, MealMate syncs core workspace data through its configured service; nutrition history and profile details are not included in that sync.
               </p>
             </div>
           </div>

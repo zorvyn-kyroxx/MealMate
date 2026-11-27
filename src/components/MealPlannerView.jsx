@@ -1,4 +1,4 @@
-import { Plus, ChevronLeft, ChevronRight, Clock3, Pencil, Trash2, ShoppingBasket } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Clock3, Pencil, Trash2, ShoppingBasket, Check, Circle } from "lucide-react";
 import { dateKey, prettyDate } from "../utils/dateUtils";
 
 export default function MealPlannerView({
@@ -12,6 +12,7 @@ export default function MealPlannerView({
   onOpenNewMeal,
   onOpenEditMeal,
   onDeleteMeal,
+  onToggleMealEaten,
   onSyncWeekToGroceries
 }) {
   return (
@@ -65,7 +66,11 @@ export default function MealPlannerView({
           const dayK = dateKey(dayDate);
           const isToday = dayK === todayKey;
           const dayMeals = meals.filter((m) => m.date === dayK);
-          const dayCal = dayMeals.reduce((s, m) => s + (Number(m.calories) || 0), 0);
+          const mealsWithCalories = dayMeals.filter((meal) =>
+            meal.calories !== null && meal.calories !== undefined && meal.calories !== ""
+            && Number.isFinite(Number(meal.calories))
+          );
+          const dayCal = mealsWithCalories.reduce((sum, meal) => sum + Number(meal.calories), 0);
 
           return (
             <div className={`day-card ${isToday ? "day-card-featured" : ""}`} key={dayK}>
@@ -74,7 +79,11 @@ export default function MealPlannerView({
                   <span className="day-number">{prettyDate(dayDate, { weekday: "short" }).toUpperCase()}</span>
                   <h3>{prettyDate(dayDate, { day: "numeric", month: "short" })}</h3>
                 </div>
-                <span className="day-meal-count">{dayMeals.length} meals · {dayCal} kcal</span>
+                <span className="day-meal-count">
+                  {dayMeals.length} meals · {mealsWithCalories.length > 0
+                    ? `${Math.round(dayCal)} kcal recorded`
+                    : "calories not recorded"}
+                </span>
               </div>
 
               {dayMeals.length === 0 ? (
@@ -87,15 +96,27 @@ export default function MealPlannerView({
                       <div className={`planner-meal-accent ${kindClass}`} />
                       <div className="planner-meal-content">
                         <span className="meal-type">{meal.type}</span>
-                        <strong>{meal.title}</strong>
+                        <strong>{meal.title}{meal.eaten && <em className="meal-eaten-badge">Eaten</em>}</strong>
                         <div className="planner-meta">
                           <Clock3 size={12} />
                           <span>{meal.time}</span>
                           <i>·</i>
-                          <span>{meal.calories} kcal</span>
+                          <span>{meal.calories === null || meal.calories === undefined || meal.calories === ""
+                            ? "Calories not recorded"
+                            : `${meal.calories} kcal`}</span>
                         </div>
                       </div>
                       <div className="meal-controls">
+                        {dayK <= todayKey && (
+                          <button
+                            className={meal.eaten ? "meal-eaten-control is-eaten" : ""}
+                            title={meal.eaten ? "Undo eaten status" : "Mark as eaten"}
+                            aria-label={meal.eaten ? `Undo eaten status for ${meal.title}` : `Mark ${meal.title} as eaten`}
+                            onClick={() => onToggleMealEaten(meal.id)}
+                          >
+                            {meal.eaten ? <Check size={14} /> : <Circle size={14} />}
+                          </button>
+                        )}
                         <button title="Edit" onClick={() => onOpenEditMeal(meal)}>
                           <Pencil size={13} />
                         </button>

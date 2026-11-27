@@ -27,8 +27,14 @@ export default function AnalyticsView({
   }, [meals]);
 
   // Calories average
-  const totalCalories = useMemo(() => meals.reduce((sum, m) => sum + (Number(m.calories) || 0), 0), [meals]);
-  const avgCaloriesPerMeal = meals.length > 0 ? Math.round(totalCalories / meals.length) : 0;
+  const mealsWithCalories = useMemo(
+    () => meals.filter((meal) => meal.calories !== null && meal.calories !== undefined
+      && meal.calories !== "" && Number.isFinite(Number(meal.calories))),
+    [meals]
+  );
+  const avgCaloriesPerMeal = mealsWithCalories.length > 0
+    ? Math.round(mealsWithCalories.reduce((sum, meal) => sum + Number(meal.calories), 0) / mealsWithCalories.length)
+    : null;
 
   // Grocery progress
   const completedGroceries = groceries.filter((g) => g.done).length;
@@ -44,10 +50,10 @@ export default function AnalyticsView({
         <div>
           <div className="eyebrow">
             <span className="eyebrow-dot" />
-            <span>SMART NUTRITION & SPENDING INSIGHTS</span>
+            <span>MEAL PLANNING & SPENDING SUMMARY</span>
           </div>
           <h1>Food & Habit Analytics</h1>
-          <p>Gain actionable visibility into your weekly meal planning patterns, nutrition targets, and food expenditures.</p>
+          <p>Review your meal schedule, recorded nutrition values, grocery progress, and spending this month.</p>
         </div>
       </div>
 
@@ -64,11 +70,11 @@ export default function AnalyticsView({
 
         <div className="analytics-card">
           <div className="analytics-header">
-            <h3>Avg Cal / Meal</h3>
+            <h3>Avg recorded kcal / serving</h3>
             <div className="stat-icon peach"><Flame size={16} /></div>
           </div>
-          <strong className="big-num">{avgCaloriesPerMeal} <span style={{ fontSize: 15, fontWeight: 500, color: "var(--muted)" }}>kcal</span></strong>
-          <p>Average energy density per scheduled dish</p>
+          <strong className="big-num">{avgCaloriesPerMeal === null ? "—" : avgCaloriesPerMeal} {avgCaloriesPerMeal !== null && <span style={{ fontSize: 15, fontWeight: 500, color: "var(--muted)" }}>kcal</span>}</strong>
+          <p>Based on {mealsWithCalories.length} meals with recorded values</p>
         </div>
 
         <div className="analytics-card">
@@ -116,7 +122,7 @@ export default function AnalyticsView({
           <div className="section-heading">
             <div>
               <h3>Financial Health & Efficiency</h3>
-              <p>Budget pacing and spending projection</p>
+              <p>Recorded expenses this month</p>
             </div>
             <CircleDollarSign size={18} className="sparkle-mark" />
           </div>
@@ -125,7 +131,7 @@ export default function AnalyticsView({
             <div className="settings-item" style={{ borderTop: 0, padding: 0 }}>
               <div className="settings-item-copy">
                 <strong>Budget Utilization</strong>
-                <span>Percentage of monthly allowance consumed</span>
+                <span>Percentage of monthly budget used</span>
               </div>
               <strong style={{ fontSize: 16, color: isUnderBudget ? "var(--green)" : "#c56f70" }}>
                 {budgetUtilization}%
@@ -143,7 +149,7 @@ export default function AnalyticsView({
             <div className="settings-item" style={{ borderTop: "1px solid var(--border)", paddingTop: 12 }}>
               <div className="settings-item-copy">
                 <strong>Expenditure Entries</strong>
-                <span>Logged food transactions</span>
+                <span>Transactions recorded this month</span>
               </div>
               <strong style={{ fontSize: 16 }}>{expenses.length} logs</strong>
             </div>
@@ -161,8 +167,8 @@ export default function AnalyticsView({
               <TrendingUp size={16} color={isUnderBudget ? "#52785c" : "#c56f70"} />
               <span style={{ fontSize: 11, fontWeight: 700, color: isUnderBudget ? "#3b5842" : "#9e3838" }}>
                 {isUnderBudget
-                  ? "Great job! Your spending is currently well within your monthly allocation."
-                  : "Attention: You have exceeded your target budget limit this period."}
+                  ? "Recorded spending is within this month's budget."
+                  : "Recorded spending has exceeded this month's budget."}
               </span>
             </div>
           </div>

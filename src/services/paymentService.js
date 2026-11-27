@@ -1,15 +1,7 @@
 /**
  * Payment Gateway Integration Service
- * Supports Razorpay Live/Sandbox Checkout with fallback to Interactive Simulator
+ * Uses a server-created Razorpay order for secure checkout
  */
-
-const RAZORPAY_KEY = import.meta.env.VITE_RAZORPAY_KEY_ID;
-
-export const isLivePaymentConfigured = Boolean(
-  RAZORPAY_KEY &&
-  RAZORPAY_KEY !== "rzp_test_placeholder" &&
-  RAZORPAY_KEY.startsWith("rzp_")
-);
 
 /**
  * Loads Razorpay checkout script dynamically
@@ -32,22 +24,24 @@ export function loadRazorpayScript() {
  * Initiates Razorpay checkout if configured
  */
 export async function launchRazorpayPayment({
-  amount, // in INR
+  order,
   planName = "MealMate Pro",
   userEmail = "user@mealmate.app",
   userName = "MealMate User",
   onSuccess,
+  onFailure,
   onDismiss
 }) {
   const loaded = await loadRazorpayScript();
-  if (!loaded || !window.Razorpay || !isLivePaymentConfigured) {
+  if (!loaded || !window.Razorpay || !order?.keyId || !order?.orderId || !Number.isInteger(order.amountPaise)) {
     return false;
   }
 
   const options = {
-    key: RAZORPAY_KEY,
-    amount: amount * 100, // Razorpay takes paise
-    currency: "INR",
+    key: order.keyId,
+    amount: order.amountPaise,
+    currency: order.currency,
+    order_id: order.orderId,
     name: "MealMate",
     description: `Subscription: ${planName}`,
     image: "/favicon.svg",
@@ -59,14 +53,14 @@ export async function launchRazorpayPayment({
       color: "#52785c"
     },
     handler: function (response) {
-      if (response.razorpay_payment_id) {
+      if (response.razorpay_payment_id && response.razorpay_order_id && response.razorpay_signature) {
         onSuccess({
           paymentId: response.razorpay_payment_id,
-          orderId: response.razorpay_order_id || `ord_${Date.now()}`,
-          signature: response.razorpay_signature,
-          amount,
-          date: new Date().toISOString()
+          orderId: response.razorpay_order_id,
+          signature: response.razorpay_signature
         });
+      } else {
+        onFailure?.();
       }
     },
     modal: {

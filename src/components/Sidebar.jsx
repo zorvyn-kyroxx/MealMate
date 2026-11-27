@@ -8,6 +8,8 @@ export default function Sidebar({
   setMobileMenu,
   user,
   userPlan,
+  accountAccessEnabled = false,
+  paymentsEnabled = false,
   onOpenAuth,
   onOpenUpgrade,
   onSignOut
@@ -22,7 +24,11 @@ export default function Sidebar({
         />
       )}
 
-      <aside className={`sidebar ${mobileMenu ? "sidebar-open" : ""}`}>
+      <aside
+        id="workspace-navigation"
+        className={`sidebar ${mobileMenu ? "sidebar-open" : ""}`}
+        aria-label="MealMate workspace"
+      >
         <div className="sidebar-brand">
           <div className="brand">
             <span className="brand-icon"><Leaf /></span>
@@ -32,16 +38,18 @@ export default function Sidebar({
             type="button"
             className="brand-plan"
             style={{
-              cursor: "pointer",
+              cursor: paymentsEnabled ? "pointer" : "not-allowed",
               border: 0,
               background: userPlan === "PRO" ? "var(--green)" : undefined,
               color: userPlan === "PRO" ? "#fff" : undefined,
               display: "flex",
               alignItems: "center",
-              gap: 3
+              gap: 3,
+              opacity: paymentsEnabled ? 1 : 0.75
             }}
+            disabled={!paymentsEnabled}
             onClick={onOpenUpgrade}
-            title="Click to view plan details"
+            title={paymentsEnabled ? "View plan details" : "Paid plans are unavailable during beta"}
           >
             {userPlan === "PRO" && <Crown size={11} />}
             <span>{userPlan}</span>
@@ -50,7 +58,7 @@ export default function Sidebar({
 
         <div className="nav-group">
           <div className="side-label">WORKSPACE</div>
-          <nav className="side-nav">
+          <nav className="side-nav" aria-label="Workspace pages">
             {navigation.map((item) => {
               const Icon = item.icon;
               const isActive = page === item.name;
@@ -58,15 +66,16 @@ export default function Sidebar({
                 <button
                   key={item.name}
                   className={`nav-link ${isActive ? "active" : ""}`}
+                  aria-current={isActive ? "page" : undefined}
                   onClick={() => {
                     setPage(item.name);
                     setMobileMenu(false);
                   }}
                 >
-                  <Icon size={18} />
+                  <Icon size={18} aria-hidden="true" />
                   <span>{item.name}</span>
                   {item.count !== undefined && item.count > 0 && (
-                    <span className="nav-count">{item.count}</span>
+                    <span className="nav-count" aria-label={`${item.count} items left to buy`}>{item.count}</span>
                   )}
                 </button>
               );
@@ -77,16 +86,26 @@ export default function Sidebar({
         <div className="sidebar-spacer" />
 
         <div className="sidebar-promo">
-          <div className="promo-spark"><Sparkles size={16} /></div>
-          <strong>{userPlan === "PRO" ? "Pro Cloud Synchronized" : "MealMate Pro Feature"}</strong>
-          <p>
-            {userPlan === "PRO"
-              ? "All your recipes, meal schedules, and grocery lists are active on your personal cloud."
-              : "Upgrade to sync your nutrition schedules across all your devices in real-time."}
-          </p>
-          <button onClick={onOpenUpgrade}>
-            {userPlan === "PRO" ? "Manage Plan" : "Explore Pro"} <ArrowUpRight size={13} />
-          </button>
+          {!paymentsEnabled && userPlan !== "PRO" ? (
+            <>
+              <div className="promo-spark"><Sparkles size={16} /></div>
+              <strong>Public beta</strong>
+              <p>Accounts, payments, and advertising are disabled by default.</p>
+            </>
+          ) : (
+            <>
+              <div className="promo-spark"><Sparkles size={16} /></div>
+              <strong>{userPlan === "PRO" ? "Pro Cloud Synchronized" : "MealMate Pro Feature"}</strong>
+              <p>
+                {userPlan === "PRO"
+                  ? "Your account has access to cloud-synced workspace features."
+                  : "Explore additional MealMate features and plan details."}
+              </p>
+              <button onClick={onOpenUpgrade}>
+                {userPlan === "PRO" ? "Manage Plan" : "Explore Pro"} <ArrowUpRight size={13} />
+              </button>
+            </>
+          )}
         </div>
 
         {/* User Profile / Auth Area */}
@@ -103,9 +122,10 @@ export default function Sidebar({
                 <button
                   type="button"
                   style={{ border: 0, background: "none", color: "var(--green)", fontWeight: 700, padding: 0, cursor: "pointer", fontSize: 11, textAlign: "left" }}
+                  disabled={!accountAccessEnabled}
                   onClick={onOpenAuth}
                 >
-                  Sign In / Register
+                  {accountAccessEnabled ? "Sign In / Register" : "Accounts disabled in beta"}
                 </button>
                 <span>Local Workspace</span>
               </>
@@ -125,7 +145,9 @@ export default function Sidebar({
             <button
               type="button"
               className="row-action-btn"
-              title="Sign in or register"
+              title={accountAccessEnabled ? "Sign in or register" : "Account access disabled in beta"}
+              aria-label={accountAccessEnabled ? "Sign in or register" : "Account access disabled in beta"}
+              disabled={!accountAccessEnabled}
               onClick={onOpenAuth}
               style={{ width: 28, height: 28 }}
             >

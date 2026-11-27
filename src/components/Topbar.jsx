@@ -7,6 +7,7 @@ export default function Topbar({
   theme,
   setTheme,
   user,
+  accountAccessEnabled = false,
   onOpenAuth,
   mobileMenu,
   setMobileMenu,
@@ -14,8 +15,15 @@ export default function Topbar({
 }) {
   return (
     <header className="topbar">
-      <button className="mobile-menu-btn" onClick={() => setMobileMenu(!mobileMenu)}>
-        <Menu size={20} />
+      <button
+        type="button"
+        className="mobile-menu-btn"
+        aria-label={mobileMenu ? "Close workspace menu" : "Open workspace menu"}
+        aria-expanded={mobileMenu}
+        aria-controls="workspace-navigation"
+        onClick={() => setMobileMenu(!mobileMenu)}
+      >
+        <Menu size={20} aria-hidden="true" />
       </button>
       <div className="breadcrumb">
         <span>Workspace</span>
@@ -28,27 +36,33 @@ export default function Topbar({
           <span>{prettyDate(today, { weekday: "short", day: "numeric", month: "short" })}</span>
         </div>
         <button
+          type="button"
           className="icon-button"
           title={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
+          aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
         >
-          {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+          {theme === "dark" ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}
         </button>
         <button
+          type="button"
           className="icon-button"
           title="Quick notification"
-          onClick={() => showNotification("Your food schedule is in sync!")}
+          aria-label="Show beta and data storage information"
+          onClick={() => showNotification("MealMate is in beta. Your workspace is stored in this browser unless you sign in.")}
         >
-          <Bell size={18} />
+          <Bell size={18} aria-hidden="true" />
         </button>
         <button
           type="button"
           className="avatar top-avatar"
           style={{ cursor: "pointer", border: 0 }}
-          title={user ? `${user.name} (${user.email})` : "Click to sign in"}
+          title={user ? `${user.name} (${user.email})` : accountAccessEnabled ? "Sign in to MealMate" : "Account access disabled in beta"}
+          aria-label={user ? `Signed in as ${user.name || user.email}` : accountAccessEnabled ? "Sign in to MealMate" : "Account access disabled in beta"}
+          disabled={!accountAccessEnabled}
           onClick={onOpenAuth}
         >
-          {user ? (user.name ? user.name[0].toUpperCase() : "M") : <UserIcon size={14} />}
+          {user ? (user.name ? user.name[0].toUpperCase() : "M") : <UserIcon size={14} aria-hidden="true" />}
         </button>
       </div>
     </header>
