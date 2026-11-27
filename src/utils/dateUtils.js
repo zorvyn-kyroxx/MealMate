@@ -28,7 +28,15 @@ export const prettyDate = (date, options = { day: "numeric", month: "short" }) =
 export const readStore = (key, fallback) => {
   try {
     const value = localStorage.getItem(key);
-    return value ? JSON.parse(value) : fallback;
+    if (!value) return fallback;
+    const parsed = JSON.parse(value);
+
+    if (Array.isArray(fallback)) return Array.isArray(parsed) ? parsed : fallback;
+    if (typeof fallback === "object" && fallback !== null) {
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : fallback;
+    }
+    if (typeof parsed !== typeof fallback) return fallback;
+    return parsed;
   } catch {
     return fallback;
   }

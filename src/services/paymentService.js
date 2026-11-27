@@ -3,6 +3,9 @@
  * Uses a server-created Razorpay order for secure checkout
  */
 
+// Payments remain intentionally disabled until order creation and signature
+// verification are implemented through a server-side endpoint.
+export const isLivePaymentConfigured = false;
 /**
  * Loads Razorpay checkout script dynamically
  */

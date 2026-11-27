@@ -4,17 +4,18 @@
  */
 
 /**
- * Sanitizes plain text inputs by escaping dangerous HTML entities
+ * Sanitizes plain text inputs for state storage and rendering.
+ * React escapes rendered text; this must not turn valid text into HTML entities.
  */
 export function sanitizeText(input) {
   if (typeof input !== "string") return input;
-  return input
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#x27;")
-    .replace(/\//g, "&#x2F;");
+  return Array.from(input)
+    .filter((character) => {
+      const code = character.charCodeAt(0);
+      return code > 31 && code !== 127;
+    })
+    .join("")
+    .trim();
 }
 
 /**

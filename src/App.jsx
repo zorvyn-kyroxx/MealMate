@@ -47,9 +47,6 @@ import { getDailyNutrition, getRecipeNutrition } from "./utils/nutrition";
 import { calculateRecipeIngredientNutrition } from "./utils/nutritionCalculator";
 import { getFoodComposition } from "./constants/foodCompositionData";
 import {
-  createDonationOrder, fetchDonationSummary, openDonationCheckout, verifyDonationPayment
-} from "./services/donationService";
-import {
   createSubscriptionOrder, fetchSubscriptionStatus, verifySubscriptionPayment
 } from "./services/subscriptionService";
 
@@ -68,7 +65,7 @@ const cloudAccountsEnabled =
   import.meta.env.VITE_CLOUD_ACCOUNTS_ENABLED === "true" && isSupabaseConfigured;
 const accountCreationEnabled =
   cloudAccountsEnabled && import.meta.env.VITE_ACCOUNT_CREATION_ENABLED === "true";
-const paymentsEnabled = import.meta.env.VITE_PAYMENTS_ENABLED === "true";
+const paymentsEnabled = false;
 
 const defaultNutritionProfile = {
   age: "",
@@ -344,11 +341,6 @@ export default function App() {
   const [feedbackEntries, setFeedbackEntries] = useState(() =>
     normalizeFeedbackEntries(readStore("mealmate-feedback", []))
   );
-  const [donationSummary, setDonationSummary] = useState(null);
-  const [donationServiceReady, setDonationServiceReady] = useState(false);
-  const [donationSummaryLoading, setDonationSummaryLoading] = useState(paymentsEnabled);
-  const [pendingDonation, setPendingDonation] = useState(null);
-
   const [weekStart, setWeekStart] = useState(() => dayStart(today));
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
@@ -409,25 +401,6 @@ export default function App() {
     localStorage.setItem("mm-custom-foods", JSON.stringify(customFoods));
   }, [customFoods]);
   useEffect(() => localStorage.setItem("mealmate-feedback", JSON.stringify(feedbackEntries)), [feedbackEntries]);
-  useEffect(() => {
-    if (!paymentsEnabled) return undefined;
-
-    let active = true;
-    fetchDonationSummary()
-      .then((summary) => {
-        if (!active) return;
-        setDonationSummary(summary);
-        setDonationServiceReady(Boolean(summary?.checkoutReady));
-      })
-      .catch(() => {
-        if (!active) return;
-        setDonationServiceReady(false);
-      })
-      .finally(() => {
-        if (active) setDonationSummaryLoading(false);
-      });
-    return () => { active = false; };
-  }, []);
   useEffect(() => {
     let active = true;
     if (!cloudAccountsEnabled || !userId || userId.startsWith("local-")) return () => { active = false; };
@@ -551,38 +524,11 @@ export default function App() {
     }
   };
 
-  const confirmDonationPayment = async (payment) => {
-    setPendingDonation(payment);
-    try {
-      const summary = await verifyDonationPayment(payment);
-      setDonationSummary(summary);
-      setDonationServiceReady(true);
-      setPendingDonation(null);
-      showNotification("Thank you for supporting the MealMate team!");
-    } catch (error) {
-      showNotification(error.message || "Payment confirmation is pending. Retry confirmation before making another donation.");
-    }
-  };
-
-  const donateToTeam = async (amount) => {
-    if (!paymentsEnabled) {
-      showNotification("Donations are not available during the free beta.");
-      return;
-    }
-    try {
-      const order = await createDonationOrder(amount);
-      await openDonationCheckout({
-        order,
-        onSuccess: confirmDonationPayment,
-        onDismiss: () => {}
-      });
-    } catch (error) {
-      showNotification(error.message || "Donation checkout is unavailable right now.");
-    }
-  };
-
   const handlePaymentSuccess = async (payment) => {
     const entitlement = await verifySubscriptionPayment(payment);
+    if (!entitlement.isPro) {
+      throw new Error("Payment has not been verified. Pro access remains locked.");
+    }
     setVerifiedPlan({ userId, plan: "PRO", expiresAt: entitlement.expiresAt });
     try {
       const existingHistory = JSON.parse(localStorage.getItem("mealmate-payments") || "[]");
@@ -666,7 +612,7 @@ export default function App() {
 
   // Meal Handlers
   const openNewMeal = (defaultDate = todayKey) => {
-    const access = checkFeatureAccess("add_meal", userPlan, meals.length);
+    const access = checkFeatureAccess("add_meal", userPlan, weekMeals.length);
     if (!access.allowed) {
       setUpgradeReason(access.reason);
       setModal("upgrade");
@@ -799,7 +745,7 @@ export default function App() {
   };
 
   const addRecipeToPlan = (recipe) => {
-    const access = checkFeatureAccess("add_meal", userPlan, meals.length);
+    const access = checkFeatureAccess("add_meal", userPlan, weekMeals.length);
     if (!access.allowed) {
       setUpgradeReason(access.reason);
       setModal("upgrade");
@@ -1021,7 +967,10 @@ export default function App() {
   };
 
   const openNewRecipe = () => {
-    const access = checkFeatureAccess("add_recipe", userPlan, recipes.length);
+    const customRecipeCount = recipes.filter(
+      (recipe) => !starterRecipes.some((starter) => starter.id === recipe.id)
+    ).length;
+    const access = checkFeatureAccess("add_recipe", userPlan, customRecipeCount);
     if (!access.allowed) {
       setUpgradeReason(access.reason);
       setModal("upgrade");
@@ -1276,8 +1225,67 @@ export default function App() {
   };
 
   const importData = (data) => {
-    if (!data || typeof data !== "object") {
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
       showNotification("Invalid backup format.");
+      return;
+    }
+
+    const isRecord = (value) => value && typeof value === "object" && !Array.isArray(value);
+    const isArrayOf = (key, predicate) =>
+      data[key] === undefined || (Array.isArray(data[key]) && data[key].every(predicate));
+    const validMeals = isArrayOf("meals", (item) =>
+      isRecord(item) && typeof item.title === "string" &&
+      typeof item.date === "string" && typeof item.type === "string"
+    );
+    const validRecipes = isArrayOf("recipes", (item) =>
+      isRecord(item) && typeof item.title === "string" &&
+      Array.isArray(item.ingredients) && item.ingredients.every((ingredient) => typeof ingredient === "string") &&
+      Array.isArray(item.instructions) && item.instructions.every((instruction) => typeof instruction === "string") &&
+      (item.calories == null || item.calories === "" ||
+        (Number.isFinite(Number(item.calories)) && Number(item.calories) >= 0)) &&
+      (item.protein == null || item.protein === "" ||
+        (Number.isFinite(Number(item.protein)) && Number(item.protein) >= 0)) &&
+      (item.servings == null ||
+        (Number.isFinite(Number(item.servings)) && Number(item.servings) > 0 && Number(item.servings) <= 50)) &&
+      (item.nutritionIngredients === undefined ||
+        (Array.isArray(item.nutritionIngredients) && item.nutritionIngredients.every((ingredient) =>
+          isRecord(ingredient) &&
+          (typeof ingredient.foodId === "string" || typeof ingredient.foodId === "number") &&
+          Number.isFinite(Number(ingredient.grams)) && Number(ingredient.grams) > 0
+        ))) &&
+      (item.nutritionSource === undefined || item.nutritionSource === null ||
+        typeof item.nutritionSource === "string")
+    );
+    const validGroceries = isArrayOf("groceries", (item) =>
+      isRecord(item) && typeof item.name === "string"
+    );
+    const validExpenses = isArrayOf("expenses", (item) =>
+      isRecord(item) && typeof item.title === "string" &&
+      Number.isFinite(Number(item.amount))
+    );
+    const validNutritionEntries = isArrayOf("nutritionEntries", (item) => isRecord(item));
+    const validFeedbackEntries = isArrayOf("feedbackEntries", (item) => isRecord(item));
+    const validCustomFoods = isArrayOf("customFoods", (item) => isRecord(item));
+    const validFavorites = isArrayOf("favorites", (id) => id !== null && id !== undefined);
+    const validNutritionProfile =
+      data.nutritionProfile === undefined || isRecord(data.nutritionProfile);
+    const validTheme = data.theme === undefined || ["light", "dark"].includes(data.theme);
+    const validScalars =
+      (data.budget === undefined || (Number.isFinite(data.budget) && data.budget >= 0)) &&
+      (data.calorieTarget === undefined || data.calorieTarget === null ||
+        (Number.isFinite(data.calorieTarget) && data.calorieTarget > 0)) &&
+      (data.servingSize === undefined || [1, 2, 4, 6].includes(data.servingSize));
+
+    if (!validMeals || !validRecipes || !validGroceries || !validExpenses ||
+      !validNutritionEntries || !validFeedbackEntries || !validCustomFoods ||
+      !validFavorites || !validNutritionProfile || !validTheme || !validScalars ||
+      (Array.isArray(data.nutritionEntries) &&
+        normalizeNutritionEntries(data.nutritionEntries).length !== data.nutritionEntries.length) ||
+      (Array.isArray(data.feedbackEntries) &&
+        normalizeFeedbackEntries(data.feedbackEntries).length !== data.feedbackEntries.length) ||
+      (Array.isArray(data.customFoods) &&
+        normalizeCustomFoods(data.customFoods).length !== data.customFoods.length)) {
+      showNotification("Backup contains invalid or corrupted workspace data.");
       return;
     }
 
@@ -1293,9 +1301,7 @@ export default function App() {
     if (Array.isArray(data.feedbackEntries)) setFeedbackEntries(normalizeFeedbackEntries(data.feedbackEntries));
     if (Array.isArray(data.customFoods)) setCustomFoods(normalizeCustomFoods(data.customFoods));
     if (data.theme === "light" || data.theme === "dark") handleThemeChange(data.theme);
-    if (data.nutritionProfile && typeof data.nutritionProfile === "object" && !Array.isArray(data.nutritionProfile)) {
-      setNutritionProfile(normalizeNutritionProfile(data.nutritionProfile));
-    }
+    if (data.nutritionProfile) setNutritionProfile(normalizeNutritionProfile(data.nutritionProfile));
 
     showNotification("Workspace data restored successfully!");
   };
@@ -1538,14 +1544,6 @@ export default function App() {
             <PricingView
               userPlan={userPlan}
               planExpiresAt={verifiedPlan.userId === userId ? verifiedPlan.expiresAt : null}
-              onOpenPayment={openPaymentModal}
-              onDonate={donateToTeam}
-              donationSummary={donationSummary}
-              donationServiceReady={donationServiceReady}
-              donationSummaryLoading={donationSummaryLoading}
-              hasPendingDonation={Boolean(pendingDonation)}
-              onRetryDonationConfirmation={() => pendingDonation && confirmDonationPayment(pendingDonation)}
-              showNotification={showNotification}
               paymentsEnabled={paymentsEnabled}
             />
           )}

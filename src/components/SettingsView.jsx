@@ -183,7 +183,7 @@ export default function SettingsView({
             <ShieldCheck size={20} color="var(--green)" style={{ flex: "0 0 auto", marginTop: 2 }} />
             <div>
               <strong style={{ fontSize: 11, color: "var(--text)", display: "block" }}>
-                100% Client-Side Privacy
+                Local-First Privacy
               </strong>
               <p style={{ margin: "4px 0 0", fontSize: 10, color: "var(--muted)", lineHeight: 1.6 }}>
                 Nutrition history and optional profile references stay in this browser’s LocalStorage. If you sign in, MealMate syncs core workspace data through its configured service; nutrition history and profile details are not included in that sync.

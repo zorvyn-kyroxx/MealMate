@@ -1,21 +1,12 @@
 import { useState } from "react";
-import { Check, Sparkles, Crown, Zap, HelpCircle, Heart, Users } from "lucide-react";
+import { Check, Sparkles, Crown, Zap, HelpCircle } from "lucide-react";
 
 export default function PricingView({
   userPlan,
   planExpiresAt,
-  onOpenPayment,
-  onDonate,
-  donationSummary,
-  donationServiceReady,
-  donationSummaryLoading,
-  hasPendingDonation,
-  onRetryDonationConfirmation,
-  showNotification,
   paymentsEnabled = false
 }) {
   const [isAnnual, setIsAnnual] = useState(true);
-  const [donationAmount, setDonationAmount] = useState("250");
 
   const freeFeatures = [
     "Weekly meal planning",
@@ -36,20 +27,6 @@ export default function PricingView({
     "Custom daily calorie and serving targets",
     "Priority support & early access to new tools"
   ];
-
-  const submitDonation = (event) => {
-    event.preventDefault();
-    if (!paymentsEnabled) {
-      showNotification("Donations are not available during the free beta.");
-      return;
-    }
-    const amount = Number(donationAmount);
-    if (!Number.isFinite(amount) || amount < 1 || amount > 100000) {
-      showNotification("Choose a donation between ₹1 and ₹1,00,000.");
-      return;
-    }
-    onDonate(amount);
-  };
 
   return (
     <>
@@ -240,14 +217,20 @@ export default function PricingView({
                 : "Subscriptions are not available during the public beta."}
             </p>
 
-            {paymentsEnabled && <div style={{ margin: "24px 0" }}>
-              <strong style={{ fontSize: 36, fontFamily: "Manrope, sans-serif", color: "var(--text)" }}>
-                {isAnnual ? "₹167" : "₹249"}
+            <div style={{ margin: "24px 0" }}>
+              <strong style={{ fontSize: 20, fontFamily: "Manrope, sans-serif", color: "var(--text)" }}>
+                {paymentsEnabled ? (isAnnual ? "₹167" : "₹249") : "Not available during beta"}
               </strong>
-              <span style={{ fontSize: 12, color: "var(--muted)", marginLeft: 6 }}>
-                / month {isAnnual ? "(billed ₹1,999/yr)" : ""}
-              </span>
-            </div>}
+              {paymentsEnabled ? (
+                <span style={{ display: "block", fontSize: 10, color: "var(--muted)", marginTop: 4 }}>
+                  Per month{isAnnual ? " · billed annually" : ""}
+                </span>
+              ) : (
+                <span style={{ display: "block", fontSize: 10, color: "var(--muted)", marginTop: 4 }}>
+                  Pricing is a preview only. No subscription or payment is collected.
+                </span>
+              )}
+            </div>
 
             {paymentsEnabled && <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 12 }}>
               {proFeatures.map((feat, i) => (
@@ -276,83 +259,14 @@ export default function PricingView({
               <button
                 className="btn btn-green hero-btn"
                 style={{ width: "100%", justifyContent: "center" }}
-                onClick={() => {
-                  if (onOpenPayment) {
-                    onOpenPayment({
-                      amount: isAnnual ? 1999 : 249,
-                      billingCycle: isAnnual ? "annual" : "monthly",
-                      planName: "MealMate Pro"
-                    });
-                  } else {
-                    showNotification("Secure checkout is unavailable right now.");
-                  }
-                }}
+                disabled
               >
-                <Zap size={16} /> Upgrade to MealMate Pro
+                <Zap size={16} /> Payments disabled
               </button>
             )}
           </div>
         </div>
       </div>
-
-      {paymentsEnabled && <section className="donation-card">
-        <div className="donation-copy">
-          <span className="donation-icon"><Heart size={20} /></span>
-          <p className="eyebrow">OPTIONAL · ONE-TIME SUPPORT</p>
-          <h2>Support the hard-working team</h2>
-          <p>MealMate is temporarily free to use. If you enjoy it, you can choose any donation amount to support the team as we keep improving the app.</p>
-          <form className="donation-form" onSubmit={submitDonation}>
-            <label htmlFor="donation-amount">Your donation (INR)</label>
-            <div className="donation-input-row">
-              <span aria-hidden="true">₹</span>
-              <input
-                id="donation-amount"
-                required
-                type="number"
-                min="1"
-                max="100000"
-                step="0.01"
-                value={donationAmount}
-                onChange={(event) => setDonationAmount(event.target.value)}
-                aria-describedby="donation-amount-help"
-              />
-              <button type="submit" className="btn btn-green" disabled={!donationServiceReady || donationSummaryLoading || hasPendingDonation}>
-                <Heart size={15} /> Donate
-              </button>
-            </div>
-            <small id="donation-amount-help">Choose ₹1–₹1,00,000. One-time payment via Razorpay.</small>
-          </form>
-          {!donationServiceReady && (
-            <p className="donation-setup-note">
-              {donationSummaryLoading
-                ? "Checking secure donation checkout…"
-                : "Donations are not live yet. The secure payment service must be configured before payments can be accepted."}
-            </p>
-          )}
-          {hasPendingDonation && (
-            <div className="donation-pending-note">
-              <span>Your payment response is awaiting server confirmation. Please don’t start another donation.</span>
-              <button type="button" className="btn-outline" onClick={onRetryDonationConfirmation}>Retry confirmation</button>
-            </div>
-          )}
-        </div>
-        <div className="donation-counter" aria-live="polite">
-          <span className="donation-counter-icon"><Users size={18} /></span>
-          <span className="donation-counter-label">Community support</span>
-          {donationSummary ? (
-            <>
-              <strong>₹{(donationSummary.totalPaise / 100).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</strong>
-              <span className="donation-counter-count">{donationSummary.donationCount} confirmed {donationSummary.donationCount === 1 ? "donation" : "donations"}</span>
-            </>
-          ) : (
-            <>
-              <strong>—</strong>
-              <span className="donation-counter-count">Live counter unavailable until payment setup is complete</span>
-            </>
-          )}
-          <small>Only captured and server-verified payments are included.</small>
-        </div>
-      </section>}
 
       {/* FAQ & Integration Note */}
       <div className="surface-card" style={{ maxWidth: 950, margin: "0 auto", padding: 28 }}>
@@ -370,9 +284,7 @@ export default function PricingView({
               Are subscriptions or donations available?
             </strong>
             <p style={{ margin: "4px 0 0", fontSize: 11, color: "var(--muted)", lineHeight: 1.6 }}>
-              {paymentsEnabled
-                ? "Review the current checkout and published terms before making a payment."
-                : "No. Checkout, subscriptions, donations, and ad scripts are disabled during this beta."}
+              No. Checkout, subscriptions, donations, and ad scripts are disabled during this beta.
             </p>
           </div>
           <div>
