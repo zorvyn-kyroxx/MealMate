@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://meal-mate-myrn.vercel.app/sitemap.xml

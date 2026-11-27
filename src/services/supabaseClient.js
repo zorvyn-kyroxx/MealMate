@@ -24,13 +24,10 @@ export const supabase = isSupabaseConfigured
  */
 export async function signUpWithEmail(email, password, displayName = "") {
   if (!isSupabaseConfigured) {
-    // Local / Demo mode fallback
-    const mockUser = {
-      id: "local-" + Date.now(),
-      email,
-      user_metadata: { full_name: displayName || email.split("@")[0] }
+    return {
+      data: { user: null },
+      error: new Error("Account registration is unavailable until Supabase is configured.")
     };
-    return { data: { user: mockUser }, error: null };
   }
 
   const { data, error } = await supabase.auth.signUp({
@@ -49,13 +46,10 @@ export async function signUpWithEmail(email, password, displayName = "") {
  */
 export async function signInWithEmail(email, password) {
   if (!isSupabaseConfigured) {
-    // Local / Demo mode fallback
-    const mockUser = {
-      id: "local-" + Date.now(),
-      email,
-      user_metadata: { full_name: email.split("@")[0] }
+    return {
+      data: { user: null },
+      error: new Error("Sign-in is unavailable until Supabase is configured.")
     };
-    return { data: { user: mockUser }, error: null };
   }
 
   const { data, error } = await supabase.auth.signInWithPassword({

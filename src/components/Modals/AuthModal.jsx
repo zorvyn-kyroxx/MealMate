@@ -6,7 +6,9 @@ export default function AuthModal({
   isOpen,
   onClose,
   onLoginSuccess,
-  showNotification
+  showNotification,
+  accountCreationEnabled = false,
+  accountAccessEnabled = false
 }) {
   const [isRegister, setIsRegister] = useState(false);
   const [name, setName] = useState("");
@@ -20,6 +22,21 @@ export default function AuthModal({
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage("");
+
+    if (!accountAccessEnabled) {
+      setErrorMessage("Account access and cloud sync are disabled during the public beta.");
+      return;
+    }
+
+    if (isRegister && !accountCreationEnabled) {
+      setErrorMessage("Account creation is paused during the beta while privacy and parental-consent safeguards are being prepared.");
+      return;
+    }
+
+    if (!isSupabaseConfigured) {
+      setErrorMessage("Sign-in is unavailable until Supabase authentication is configured.");
+      return;
+    }
 
     if (!email.trim() || !password.trim()) {
       setErrorMessage("Please enter both email and password.");
@@ -88,23 +105,28 @@ export default function AuthModal({
         <div style={{
           padding: "8px 12px",
           borderRadius: "8px",
-          background: isSupabaseConfigured ? "var(--green-soft)" : "#fff8e6",
-          border: `1px solid ${isSupabaseConfigured ? "#c8dec7" : "#fae09c"}`,
+          background: accountAccessEnabled && isSupabaseConfigured ? "var(--green-soft)" : "#fff8e6",
+          border: `1px solid ${accountAccessEnabled && isSupabaseConfigured ? "#c8dec7" : "#fae09c"}`,
           display: "flex",
           alignItems: "center",
           gap: 8,
           marginBottom: 16,
           fontSize: 10,
           fontWeight: 700,
-          color: isSupabaseConfigured ? "#385940" : "#8c6b12"
+          color: accountAccessEnabled && isSupabaseConfigured ? "#385940" : "#8c6b12"
         }}>
           <Cloud size={14} />
           <span>
-            {isSupabaseConfigured
+            {accountAccessEnabled && isSupabaseConfigured
               ? "Cloud Database Synced (Supabase Active)"
-              : "Local Auth Mode (Add keys to .env to enable Supabase)"}
+              : "Account access and cloud sync are disabled during beta"}
           </span>
         </div>
+        {!accountAccessEnabled && (
+          <p role="status" style={{ margin: "0 0 16px", fontSize: 11, color: "var(--muted)", lineHeight: 1.5 }}>
+            MealMate works without an account. Your workspace stays in this browser; clearing its storage can erase saved data.
+          </p>
+        )}
 
         {/* Tab Selector */}
         <div style={{ display: "flex", background: "var(--background)", borderRadius: 10, padding: 3, marginBottom: 16 }}>
@@ -126,7 +148,7 @@ export default function AuthModal({
           >
             Sign In
           </button>
-          <button
+          {accountCreationEnabled && <button
             type="button"
             style={{
               flex: 1,
@@ -143,8 +165,16 @@ export default function AuthModal({
             onClick={() => { setIsRegister(true); setErrorMessage(""); }}
           >
             Register
-          </button>
+          </button>}
         </div>
+
+        {!accountCreationEnabled && (
+          <p role="status" style={{ margin: "0 0 16px", fontSize: 11, color: "var(--muted)", lineHeight: 1.5 }}>
+            {accountAccessEnabled
+              ? "New account creation is paused while privacy and parental-consent safeguards are prepared."
+              : "Account access and new registrations are paused while privacy and parental-consent safeguards are prepared."}
+          </p>
+        )}
 
         {errorMessage && (
           <div style={{
@@ -169,6 +199,7 @@ export default function AuthModal({
                 <input
                   required
                   type="text"
+                  disabled={!accountAccessEnabled || !isSupabaseConfigured}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Alex Johnson"
@@ -185,6 +216,7 @@ export default function AuthModal({
               <input
                 required
                 type="email"
+                disabled={!accountAccessEnabled || !isSupabaseConfigured}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@example.com"
@@ -200,6 +232,7 @@ export default function AuthModal({
               <input
                 required
                 type="password"
+                disabled={!accountAccessEnabled || !isSupabaseConfigured}
                 minLength={6}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -213,23 +246,25 @@ export default function AuthModal({
           <button
             className="btn btn-green modal-submit"
             type="submit"
-            disabled={loading}
+            disabled={loading || !accountAccessEnabled || !isSupabaseConfigured}
             style={{ marginTop: 10, width: "100%" }}
           >
             {loading ? "Processing..." : isRegister ? "Create Account" : "Sign In to Workspace"}
           </button>
         </form>
 
-        <p style={{ margin: "16px 0 0", textAlign: "center", fontSize: 10, color: "var(--muted)" }}>
-          {isRegister ? "Already registered?" : "Don't have an account yet?"}{" "}
-          <button
-            type="button"
-            style={{ border: 0, background: "none", color: "var(--green)", fontWeight: 700, cursor: "pointer", padding: 0 }}
-            onClick={() => { setIsRegister(!isRegister); setErrorMessage(""); }}
-          >
-            {isRegister ? "Sign in instead" : "Create one now"}
-          </button>
-        </p>
+          {accountCreationEnabled && (
+            <p style={{ margin: "16px 0 0", textAlign: "center", fontSize: 10, color: "var(--muted)" }}>
+              {isRegister ? "Already registered?" : "Don't have an account yet?"}{" "}
+              <button
+                type="button"
+                style={{ border: 0, background: "none", color: "var(--green)", fontWeight: 700, cursor: "pointer", padding: 0 }}
+                onClick={() => { setIsRegister(!isRegister); setErrorMessage(""); }}
+              >
+                {isRegister ? "Sign in instead" : "Create one now"}
+              </button>
+            </p>
+          )}
       </div>
     </div>
   );

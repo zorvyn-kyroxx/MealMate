@@ -13,6 +13,15 @@ export const dateKey = (date) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
+export const expensesInMonth = (expenses, yearMonth) => {
+  if (!Array.isArray(expenses) || !/^\d{4}-\d{2}$/.test(yearMonth)) return [];
+  return expenses.filter((expense) => (
+    typeof expense?.date === "string"
+    && /^\d{4}-\d{2}-\d{2}$/.test(expense.date)
+    && expense.date.slice(0, 7) === yearMonth
+  ));
+};
+
 export const prettyDate = (date, options = { day: "numeric", month: "short" }) =>
   new Intl.DateTimeFormat("en-IN", options).format(date);
 

@@ -1,19 +1,35 @@
-import { X, Clock3, Flame, ChefHat, Plus, Trash2 } from "lucide-react";
+import { X, Clock3, Flame, ChefHat, Plus, Trash2, Dumbbell, Heart } from "lucide-react";
+import { getRecipeNutrition } from "../../utils/nutrition";
+import RecipeImage from "../RecipeImage";
 
 export default function RecipeDetailModal({
   isOpen,
   onClose,
   selectedRecipe,
+  isFavorite,
+  onToggleFavorite,
   onAddIngredientsToGroceries,
   onAddRecipeToPlan,
-  onDeleteRecipe
+  onDeleteRecipe,
+  customFoods
 }) {
   if (!isOpen || !selectedRecipe) return null;
+  const nutrition = getRecipeNutrition(selectedRecipe, customFoods);
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="recipe-detail-modal" onClick={(e) => e.stopPropagation()}>
-        <img src={selectedRecipe.image} alt={selectedRecipe.title} />
+        <RecipeImage src={selectedRecipe.image} alt={selectedRecipe.title} className="recipe-detail-image" loading="eager" />
+        {selectedRecipe.imageCredit && selectedRecipe.imageCreditUrl && (
+          <a
+            className="detail-image-credit"
+            href={selectedRecipe.imageCreditUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {selectedRecipe.imageCredit}
+          </a>
+        )}
         <button className="detail-close" onClick={onClose} title="Close">
           <X size={18} />
         </button>
@@ -21,16 +37,30 @@ export default function RecipeDetailModal({
         <div className="detail-content">
           <div className="eyebrow">
             <span className="eyebrow-dot" />
-            <span>{selectedRecipe.category.toUpperCase()} RECIPE</span>
+            <span>
+              {(selectedRecipe.categories?.length ? selectedRecipe.categories : [selectedRecipe.category])
+                .join(" · ")
+                .toUpperCase()} RECIPE
+            </span>
           </div>
           <h2>{selectedRecipe.title}</h2>
           <p>{selectedRecipe.description}</p>
+          <button
+            type="button"
+            className={`btn-outline recipe-detail-favorite ${isFavorite ? "is-favorite" : ""}`}
+            onClick={() => onToggleFavorite(selectedRecipe.id)}
+          >
+            <Heart size={14} fill={isFavorite ? "currentColor" : "none"} />
+            {isFavorite ? "Saved to favourites" : "Save as favourite"}
+          </button>
 
           <div className="detail-stats">
             <span><Clock3 size={15} /> {selectedRecipe.time} minutes</span>
-            <span><Flame size={15} /> {selectedRecipe.calories} kcal</span>
+            <span><Flame size={15} /> {nutrition.calories === null ? "Calories not provided" : `${Math.round(nutrition.calories)} kcal`}</span>
+            <span><Dumbbell size={15} /> {nutrition.protein === null ? "Protein not provided" : `~${Math.round(nutrition.protein)} g protein`}</span>
             <span><ChefHat size={15} /> {selectedRecipe.servings} {selectedRecipe.servings === 1 ? "serving" : "servings"}</span>
           </div>
+          <p className="recipe-detail-nutrition-note">{nutrition.source}. Values are estimates per serving and can vary with ingredients, brands and portions.</p>
 
           <div style={{ marginTop: 20 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>

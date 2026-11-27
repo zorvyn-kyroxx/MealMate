@@ -3,10 +3,10 @@ import { X, Crown, Check, Zap, AlertTriangle } from "lucide-react";
 export default function UpgradeModal({
   isOpen,
   onClose,
-  onUpgradeToPro,
   onOpenPayment,
   onNavigateToPricing,
-  upgradeReason = ""
+  upgradeReason = "",
+  showNotification
 }) {
   if (!isOpen) return null;
 
@@ -19,7 +19,7 @@ export default function UpgradeModal({
         amount: 1999
       });
     } else {
-      onUpgradeToPro();
+      showNotification("Secure checkout is unavailable right now.");
     }
   };
 

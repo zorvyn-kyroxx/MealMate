@@ -1,0 +1,6 @@
+[functions.donations]
+# Donations are a public checkout flow; the function verifies payment server-side.
+verify_jwt = false
+
+[functions.subscriptions]
+verify_jwt = true

@@ -1,25 +1,32 @@
-import { Plus, ArrowUpRight, CalendarDays, Flame, ShoppingBasket, CircleDollarSign, ChevronRight, Coffee, Clock3, Pencil, Sparkles, Eye, Utensils } from "lucide-react";
+import { Plus, ArrowUpRight, CalendarDays, Flame, ShoppingBasket, CircleDollarSign, ChevronRight, Coffee, Clock3, Pencil, Sparkles, Eye, Utensils, Check } from "lucide-react";
 import heroImg from "../assets/hero.png";
 import { prettyDate } from "../utils/dateUtils";
+import { getRecipeNutrition } from "../utils/nutrition";
+import RecipeImage from "./RecipeImage";
+import AdSlot from "./AdSlot";
 
 export default function DashboardView({
   today,
   todayKey,
   weekMeals,
   todayMeals,
-  todayCalories,
+  nutritionTotals,
+  onToggleMealEaten,
   groceries,
   completedGroceries,
   groceryProgress,
   totalSpent,
   remainingBudget,
   starterRecipe,
+  customFoods,
   iconForMeal,
   onOpenNewMeal,
   onOpenEditMeal,
   onOpenRecipeDetails,
   onNavigate
 }) {
+  const starterRecipeNutrition = getRecipeNutrition(starterRecipe, customFoods);
+  const hasNutritionEntries = nutritionTotals.entries.length > 0;
   return (
     <>
       <div className="page-heading">
@@ -41,7 +48,7 @@ export default function DashboardView({
         <div className="dashboard-hero-copy">
           <span className="hero-kicker">SMART ROUTINE</span>
           <h2>Make room for<br /><em>something delicious.</em></h2>
-          <p>Your week is mapped out with nourishing dishes. Keep consistency and feel your best.</p>
+          <p>Plan your meals, organise ingredients, and keep your week in one place.</p>
           <button className="hero-text-button" onClick={() => onNavigate("Meal Planner")}>
             Inspect weekly calendar <ArrowUpRight size={15} />
           </button>
@@ -64,16 +71,16 @@ export default function DashboardView({
             <div className="stat-icon sage"><CalendarDays size={16} /></div>
           </div>
           <strong>{weekMeals.length}</strong>
-          <small className="stat-trend">Across current 7 days</small>
+          <small className="stat-trend">Across the current 7 days</small>
         </div>
 
         <div className="stat-card">
           <div className="stat-top">
-            <span>Today's calories</span>
+            <span>Meals planned today</span>
             <div className="stat-icon peach"><Flame size={16} /></div>
           </div>
-          <strong>{todayCalories} <span className="stat-denom">kcal</span></strong>
-          <small>{todayMeals.length} meals scheduled today</small>
+          <strong>{todayMeals.length}</strong>
+          <small>Planned only; not counted as eaten</small>
         </div>
 
         <div className="stat-card">
@@ -87,12 +94,27 @@ export default function DashboardView({
 
         <div className="stat-card">
           <div className="stat-top">
-            <span>Food spend</span>
+            <span>Food spend this month</span>
             <div className="stat-icon lilac"><CircleDollarSign size={16} /></div>
           </div>
           <strong>₹{totalSpent.toLocaleString("en-IN")}</strong>
           <small>₹{remainingBudget.toLocaleString("en-IN")} remaining</small>
         </div>
+      </section>
+
+      <AdSlot placement="dashboard" />
+
+      <section className="dashboard-nutrition-grid" aria-label="Today's nutrition">
+        <button className="dashboard-nutrition-card" onClick={() => onNavigate("Smart Nutrition Calculator")}>
+          <span className="nutrition-card-icon calorie"><Flame size={17} /></span>
+          <span><small>Calories recorded today</small><strong>{!hasNutritionEntries ? "No entries" : nutritionTotals.hasUnknownCalories ? "Partial" : <>{Math.round(nutritionTotals.calories)} <i>kcal</i></>}</strong></span>
+          <span className="nutrition-card-link">{hasNutritionEntries ? "Missing values are excluded" : "Log food after you eat"} <ChevronRight size={14} /></span>
+        </button>
+        <button className="dashboard-nutrition-card" onClick={() => onNavigate("Smart Nutrition Calculator")}>
+          <span className="nutrition-card-icon protein"><Utensils size={17} /></span>
+          <span><small>Protein recorded today</small><strong>{!hasNutritionEntries ? "No entries" : nutritionTotals.hasUnknownProtein ? "Partial" : `${Math.round(nutritionTotals.protein * 10) / 10} g`}</strong></span>
+          <span className="nutrition-card-link">{hasNutritionEntries ? "Missing values are excluded" : "Log food after you eat"} <ChevronRight size={14} /></span>
+        </button>
       </section>
 
       {/* Dashboard Panels */}
@@ -130,7 +152,9 @@ export default function DashboardView({
                     <div className="meal-list-info">
                       <strong>{meal.title}</strong>
                       <span>
-                        {meal.type} <i>·</i> {meal.calories} kcal
+                        {meal.type} <i>·</i> {meal.calories === null || meal.calories === undefined || meal.calories === ""
+                          ? "Calories not recorded"
+                          : `${meal.calories} kcal`} {meal.eaten && <em className="meal-eaten-badge">Eaten</em>}
                       </span>
                     </div>
                     <div className="meal-list-time">
@@ -143,6 +167,14 @@ export default function DashboardView({
                       onClick={() => onOpenEditMeal(meal)}
                     >
                       <Pencil size={13} />
+                    </button>
+                    <button
+                      className={`meal-eaten-toggle ${meal.eaten ? "is-eaten" : ""}`}
+                      title={meal.eaten ? "Undo eaten status" : "Mark as eaten"}
+                      aria-label={meal.eaten ? `Undo eaten status for ${meal.title}` : `Mark ${meal.title} as eaten`}
+                      onClick={() => onToggleMealEaten(meal.id)}
+                    >
+                      <Check size={14} />
                     </button>
                   </div>
                 );
@@ -159,7 +191,7 @@ export default function DashboardView({
           <div className="section-heading">
             <div>
               <h3>Weekly Inspiration</h3>
-              <p>Hand-picked for balanced nutrition</p>
+              <p>Explore a recipe from your library</p>
             </div>
             <Sparkles size={18} className="sparkle-mark" />
           </div>
@@ -167,11 +199,22 @@ export default function DashboardView({
           {starterRecipe && (
             <div className="inspiration-card">
               <div className="inspiration-photo">
-                <img src={starterRecipe.image} alt={starterRecipe.title} />
+                <RecipeImage src={starterRecipe.image} alt={starterRecipe.title} loading="eager" />
                 <span className="photo-label">{starterRecipe.category.toUpperCase()}</span>
+                {starterRecipe.imageCredit && starterRecipe.imageCreditUrl && (
+                  <a
+                    className="dashboard-image-credit"
+                    href={starterRecipe.imageCreditUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {starterRecipe.imageCredit}
+                  </a>
+                )}
               </div>
               <h4>{starterRecipe.title}</h4>
               <p>{starterRecipe.description}</p>
+              <span className="dashboard-recipe-protein">{starterRecipeNutrition.calories === null ? "—" : Math.round(starterRecipeNutrition.calories)} kcal · {starterRecipeNutrition.protein === null ? "Protein n/a" : `${Math.round(starterRecipeNutrition.protein)}g protein`} per serving · estimate</span>
               <button
                 className="btn btn-green"
                 style={{ width: "100%", justifyContent: "center" }}
