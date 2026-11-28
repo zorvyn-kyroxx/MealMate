@@ -115,6 +115,16 @@ export default function DashboardView({
           <span><small>Protein recorded today</small><strong>{!hasNutritionEntries ? "No entries" : nutritionTotals.hasUnknownProtein ? "Partial" : `${Math.round(nutritionTotals.protein * 10) / 10} g`}</strong></span>
           <span className="nutrition-card-link">{hasNutritionEntries ? "Missing values are excluded" : "Log food after you eat"} <ChevronRight size={14} /></span>
         </button>
+        <button className="dashboard-nutrition-card" onClick={() => onNavigate("Smart Nutrition Calculator")}>
+          <span className="nutrition-card-icon protein"><Utensils size={17} /></span>
+          <span><small>Carbohydrates recorded today</small><strong>{!hasNutritionEntries ? "No entries" : nutritionTotals.hasUnknownCarbohydrates ? "Partial" : `${Math.round(nutritionTotals.carbohydrates * 10) / 10} g`}</strong></span>
+          <span className="nutrition-card-link">{hasNutritionEntries ? "Missing values are excluded" : "Log food after you eat"} <ChevronRight size={14} /></span>
+        </button>
+        <button className="dashboard-nutrition-card" onClick={() => onNavigate("Smart Nutrition Calculator")}>
+          <span className="nutrition-card-icon protein"><Utensils size={17} /></span>
+          <span><small>Fat recorded today</small><strong>{!hasNutritionEntries ? "No entries" : nutritionTotals.hasUnknownFat ? "Partial" : `${Math.round(nutritionTotals.fat * 10) / 10} g`}</strong></span>
+          <span className="nutrition-card-link">{hasNutritionEntries ? "Missing values are excluded" : "Log food after you eat"} <ChevronRight size={14} /></span>
+        </button>
       </section>
 
       {/* Dashboard Panels */}

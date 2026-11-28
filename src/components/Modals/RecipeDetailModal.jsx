@@ -58,6 +58,8 @@ export default function RecipeDetailModal({
             <span><Clock3 size={15} /> {selectedRecipe.time} minutes</span>
             <span><Flame size={15} /> {nutrition.calories === null ? "Calories not provided" : `${Math.round(nutrition.calories)} kcal`}</span>
             <span><Dumbbell size={15} /> {nutrition.protein === null ? "Protein not provided" : `~${Math.round(nutrition.protein)} g protein`}</span>
+            <span>Carbs: {nutrition.carbohydrates === null ? "not provided" : `${Math.round(nutrition.carbohydrates * 10) / 10} g`}</span>
+            <span>Fat: {nutrition.fat === null ? "not provided" : `${Math.round(nutrition.fat * 10) / 10} g`}</span>
             <span><ChefHat size={15} /> {selectedRecipe.servings} {selectedRecipe.servings === 1 ? "serving" : "servings"}</span>
           </div>
           <p className="recipe-detail-nutrition-note">{nutrition.source}. Values are estimates per serving and can vary with ingredients, brands and portions.</p>

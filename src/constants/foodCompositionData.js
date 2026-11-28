@@ -10,6 +10,8 @@ export const foodCompositionData = [
     state: "Cooked, edible meat",
     caloriesPer100g: 165,
     proteinPer100g: 31,
+    carbohydratesPer100g: 0,
+    fatPer100g: 3.6,
     source: foodCompositionSource,
     sourceUrl: foodDataUrl(171477)
   },
@@ -20,6 +22,8 @@ export const foodCompositionData = [
     state: "Cooked, drained edible portion",
     caloriesPer100g: 164,
     proteinPer100g: 8.86,
+    carbohydratesPer100g: 27.42,
+    fatPer100g: 2.59,
     source: foodCompositionSource,
     sourceUrl: foodDataUrl(173799)
   },
@@ -30,6 +34,8 @@ export const foodCompositionData = [
     state: "Cooked, drained edible portion",
     caloriesPer100g: 127,
     proteinPer100g: 8.67,
+    carbohydratesPer100g: 22.8,
+    fatPer100g: 0.5,
     source: foodCompositionSource,
     sourceUrl: foodDataUrl(175242)
   },
@@ -40,6 +46,8 @@ export const foodCompositionData = [
     state: "Cooked, edible portion",
     caloriesPer100g: 155,
     proteinPer100g: 12.6,
+    carbohydratesPer100g: 1.12,
+    fatPer100g: 10.6,
     source: foodCompositionSource,
     sourceUrl: foodDataUrl(173424)
   },
@@ -50,6 +58,8 @@ export const foodCompositionData = [
     state: "Raw, edible portion",
     caloriesPer100g: 89,
     proteinPer100g: 1.09,
+    carbohydratesPer100g: 22.84,
+    fatPer100g: 0.33,
     source: foodCompositionSource,
     sourceUrl: foodDataUrl(173944)
   }

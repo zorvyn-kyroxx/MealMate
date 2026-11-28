@@ -41,3 +41,26 @@ export const readStore = (key, fallback) => {
     return fallback;
   }
 };
+
+export const writeStore = (key, value) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export const isCompleteWorkspaceData = (data) => {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return false;
+  return [
+    "meals",
+    "recipes",
+    "groceries",
+    "expenses",
+    "favorites"
+  ].every((key) => Array.isArray(data[key]))
+    && typeof data.budget === "number"
+    && Number.isFinite(data.budget)
+    && data.budget >= 0;
+};

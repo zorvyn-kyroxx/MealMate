@@ -112,6 +112,8 @@ test("ingredient macros scale by grams and are divided by recipe servings", () =
   assert.equal(recipe.totalProtein, 93);
   assert.equal(recipe.caloriesPerServing, 165);
   assert.equal(recipe.proteinPerServing, 31);
+  assert.equal(recipe.carbohydratesPerServing, 0);
+  assert.equal(recipe.fatPerServing, 3.6);
 });
 
 test("custom food ingredients use their stated per-100 g values", () => {

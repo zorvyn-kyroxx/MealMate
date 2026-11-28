@@ -20,6 +20,8 @@ export const getRecipeNutrition = (recipe, customFoods = []) => {
     return {
       calories: ingredientNutrition.caloriesPerServing,
       protein: ingredientNutrition.proteinPerServing,
+      carbohydrates: ingredientNutrition.carbohydratesPerServing,
+      fat: ingredientNutrition.fatPerServing,
       source: ingredientNutrition.hasUserEnteredFood
         ? "USDA data and user-entered values for listed ingredients"
         : "USDA food composition data for listed ingredients",
@@ -32,6 +34,8 @@ export const getRecipeNutrition = (recipe, customFoods = []) => {
   return {
     calories: hasRecordedSource ? numericValue(recipe.calories) : null,
     protein: hasRecordedSource ? numericValue(getRecipeProtein(recipe) ?? (/user-entered/i.test(source) ? recipe.protein : null)) : null,
+    carbohydrates: hasRecordedSource ? numericValue(recipe.carbohydrates) : null,
+    fat: hasRecordedSource ? numericValue(recipe.fat) : null,
     source: hasRecordedSource ? source : "Nutrition not provided (no recorded source)",
     estimated: true
   };
@@ -46,7 +50,13 @@ export const getMealMacros = (meal, recipes, customFoods = []) => {
 
   return {
     calories: calories === null ? null : calories * servings,
-    protein: protein === null ? null : protein * servings
+    protein: protein === null ? null : protein * servings,
+    carbohydrates: numericValue(meal.carbohydrates ?? recipeNutrition.carbohydrates) === null
+      ? null
+      : numericValue(meal.carbohydrates ?? recipeNutrition.carbohydrates) * servings,
+    fat: numericValue(meal.fat ?? recipeNutrition.fat) === null
+      ? null
+      : numericValue(meal.fat ?? recipeNutrition.fat) * servings
   };
 };
 
@@ -57,13 +67,19 @@ export const getFoodEntryMacros = (entry) => {
 
   return {
     calories: calories === null ? null : calories * servings,
-    protein: protein === null ? null : protein * servings
+    protein: protein === null ? null : protein * servings,
+    carbohydrates: numericValue(entry.carbohydrates) === null ? null : numericValue(entry.carbohydrates) * servings,
+    fat: numericValue(entry.fat) === null ? null : numericValue(entry.fat) * servings
   };
 };
 
 export const getDailyNutrition = ({ date, today, meals, nutritionEntries, recipes, customFoods = [] }) => {
   if (date > today) {
-    return { entries: [], calories: 0, protein: 0, hasUnknownProtein: false, hasUnknownCalories: false };
+    return {
+      entries: [], calories: 0, protein: 0, carbohydrates: 0, fat: 0,
+      hasUnknownProtein: false, hasUnknownCalories: false,
+      hasUnknownCarbohydrates: false, hasUnknownFat: false
+    };
   }
 
   const loggedMeals = meals
@@ -97,9 +113,17 @@ export const getDailyNutrition = ({ date, today, meals, nutritionEntries, recipe
       entries,
       calories: totals.calories + (entry.calories || 0),
       protein: totals.protein + (entry.protein || 0),
+      carbohydrates: totals.carbohydrates + (entry.carbohydrates || 0),
+      fat: totals.fat + (entry.fat || 0),
       hasUnknownProtein: totals.hasUnknownProtein || entry.protein === null,
-      hasUnknownCalories: totals.hasUnknownCalories || entry.calories === null
+      hasUnknownCalories: totals.hasUnknownCalories || entry.calories === null,
+      hasUnknownCarbohydrates: totals.hasUnknownCarbohydrates || entry.carbohydrates === null,
+      hasUnknownFat: totals.hasUnknownFat || entry.fat === null
     }),
-    { entries, calories: 0, protein: 0, hasUnknownProtein: false, hasUnknownCalories: false }
+    {
+      entries, calories: 0, protein: 0, carbohydrates: 0, fat: 0,
+      hasUnknownProtein: false, hasUnknownCalories: false,
+      hasUnknownCarbohydrates: false, hasUnknownFat: false
+    }
   );
 };

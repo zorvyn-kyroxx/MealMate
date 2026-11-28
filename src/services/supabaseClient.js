@@ -1,6 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 import { normalizeSupabaseUrl } from "../utils/supabaseUrl";
 
+let syncQueue = Promise.resolve();
+
 // Retrieve environment variables (accept both standard anon and publishable key names)
 const supabaseUrl = normalizeSupabaseUrl(import.meta.env.VITE_SUPABASE_URL);
 const supabaseBrowserKey = [
@@ -49,7 +51,10 @@ export async function signUpWithEmail(email, password, displayName = "") {
     email,
     password,
     options: {
-      data: { full_name: displayName }
+      data: { full_name: displayName },
+      emailRedirectTo: typeof window !== "undefined"
+        ? `${window.location.origin}/`
+        : undefined
     }
   });
 
@@ -110,30 +115,35 @@ export async function syncUserDataToCloud(userId, workspaceData) {
     throw new Error("Cloud workspace sync requires a configured Supabase client and signed-in user.");
   }
 
-  const { data: existingWorkspace, error: fetchError } = await supabase
-    .from("user_workspaces")
-    .select("data")
-    .eq("user_id", userId)
-    .maybeSingle();
+  const write = async () => {
+    const { data: existingWorkspace, error: fetchError } = await supabase
+      .from("user_workspaces")
+      .select("data")
+      .eq("user_id", userId)
+      .maybeSingle();
 
-  if (fetchError) throw fetchError;
-  const existingData = existingWorkspace?.data;
-  const mergedData = {
-    ...(existingData && typeof existingData === "object" && !Array.isArray(existingData)
-      ? existingData
-      : {}),
-    ...workspaceData
+    if (fetchError) throw fetchError;
+    const existingData = existingWorkspace?.data;
+    const mergedData = {
+      ...(existingData && typeof existingData === "object" && !Array.isArray(existingData)
+        ? existingData
+        : {}),
+      ...workspaceData
+    };
+    const { error } = await supabase
+      .from("user_workspaces")
+      .upsert({
+        user_id: userId,
+        data: mergedData,
+        updated_at: new Date().toISOString()
+      }, { onConflict: "user_id" });
+
+    if (error) throw error;
+    return true;
   };
-  const { error } = await supabase
-    .from("user_workspaces")
-    .upsert({
-      user_id: userId,
-      data: mergedData,
-      updated_at: new Date().toISOString()
-    }, { onConflict: "user_id" });
 
-  if (error) throw error;
-  return true;
+  syncQueue = syncQueue.catch(() => undefined).then(write);
+  return syncQueue;
 }
 
 /**

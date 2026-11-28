@@ -159,6 +159,8 @@ export default function RecipesView({
                   <span><Clock3 size={13} /> {recipe.time} min</span>
                   <span><Flame size={13} /> {nutrition.calories === null ? "—" : Math.round(nutrition.calories)} kcal</span>
                   <span className="recipe-protein-meta"><Dumbbell size={13} /> {nutrition.protein === null ? "—" : `~${Math.round(nutrition.protein)}g`} protein</span>
+                  <span>{nutrition.carbohydrates === null ? "Carbs n/a" : `${Math.round(nutrition.carbohydrates * 10) / 10}g carbs`}</span>
+                  <span>{nutrition.fat === null ? "Fat n/a" : `${Math.round(nutrition.fat * 10) / 10}g fat`}</span>
                 </div>
                 <button
                   type="button"

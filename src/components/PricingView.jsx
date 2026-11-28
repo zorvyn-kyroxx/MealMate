@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Sparkles, Crown, Zap, HelpCircle } from "lucide-react";
+import { fetchDonationSummary } from "../services/donationService";
 
 export default function PricingView({
   userPlan,
@@ -7,6 +8,22 @@ export default function PricingView({
   paymentsEnabled = false
 }) {
   const [isAnnual, setIsAnnual] = useState(true);
+  const [supportSummary, setSupportSummary] = useState({
+    totalPaise: 0,
+    donationCount: 0,
+    checkoutReady: false
+  });
+  useEffect(() => {
+    let active = true;
+    fetchDonationSummary()
+      .then((summary) => {
+        if (active && summary) setSupportSummary(summary);
+      })
+      .catch(() => {
+        if (active) setSupportSummary({ totalPaise: 0, donationCount: 0, checkoutReady: false });
+      });
+    return () => { active = false; };
+  }, []);
 
   const freeFeatures = [
     "Weekly meal planning",
@@ -219,11 +236,11 @@ export default function PricingView({
 
             <div style={{ margin: "24px 0" }}>
               <strong style={{ fontSize: 20, fontFamily: "Manrope, sans-serif", color: "var(--text)" }}>
-                {paymentsEnabled ? (isAnnual ? "₹167" : "₹249") : "Not available during beta"}
+                {paymentsEnabled ? "Subscription pricing unavailable" : "Not available during beta"}
               </strong>
               {paymentsEnabled ? (
                 <span style={{ display: "block", fontSize: 10, color: "var(--muted)", marginTop: 4 }}>
-                  Per month{isAnnual ? " · billed annually" : ""}
+                  Final terms will be published before checkout is enabled.
                 </span>
               ) : (
                 <span style={{ display: "block", fontSize: 10, color: "var(--muted)", marginTop: 4 }}>
@@ -267,6 +284,39 @@ export default function PricingView({
           </div>
         </div>
       </div>
+
+      {/* Voluntary Support */}
+      <section className="surface-card" style={{ maxWidth: 950, margin: "24px auto 24px", padding: 28 }} aria-labelledby="support-mealmate-heading">
+        <div className="section-heading" style={{ marginBottom: 16 }}>
+          <div>
+            <span className="eyebrow">VOLUNTARY PROJECT SUPPORT</span>
+            <h3 id="support-mealmate-heading" style={{ marginTop: 8 }}>Support MealMate</h3>
+            <p>Optional contributions help sustain the project. They are separate from subscriptions and do not unlock paid features.</p>
+          </div>
+          <Sparkles size={18} className="sparkle-mark" />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+          <div style={{ padding: 16, borderRadius: 12, background: "var(--green-soft)", border: "1px solid #dbe7d8" }}>
+            <small style={{ color: "var(--muted)" }}>Verified contributions</small>
+            <strong style={{ display: "block", marginTop: 6, fontSize: 24 }}>
+              {supportSummary.donationCount}
+            </strong>
+            <span style={{ color: "var(--muted)", fontSize: 10 }}>Contribution counter</span>
+          </div>
+          <div style={{ padding: 16, borderRadius: 12, background: "var(--background)", border: "1px solid var(--border)" }}>
+            <small style={{ color: "var(--muted)" }}>Verified contribution total</small>
+            <strong style={{ display: "block", marginTop: 6, fontSize: 24 }}>
+              ₹{(supportSummary.totalPaise / 100).toLocaleString("en-IN")}
+            </strong>
+            <span style={{ color: "var(--muted)", fontSize: 10 }}>
+              {supportSummary.checkoutReady ? "Provider records available" : "No verified contributions or checkout configured"}
+            </span>
+          </div>
+        </div>
+        <button className="btn btn-outline" type="button" style={{ width: "100%", marginTop: 16 }} disabled>
+          Contributions are currently disabled
+        </button>
+      </section>
 
       {/* FAQ & Integration Note */}
       <div className="surface-card" style={{ maxWidth: 950, margin: "0 auto", padding: 28 }}>

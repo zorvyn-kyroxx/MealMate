@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import {
   LayoutDashboard, CalendarDays, BookOpen, ShoppingBasket, Wallet,
   BarChart3, Settings, Crown, Sparkles, Activity, MessageSquare
@@ -6,7 +6,10 @@ import {
 import "./App.css";
 
 // Utilities & Initial Data
-import { dayStart, dateKey, prettyDate, readStore, expensesInMonth } from "./utils/dateUtils";
+import {
+  dayStart, dateKey, prettyDate, readStore, writeStore, expensesInMonth,
+  isCompleteWorkspaceData
+} from "./utils/dateUtils";
 import {
   clearLegacyDemoMealCalories,
   migrateLegacySeedDescription
@@ -205,6 +208,8 @@ const normalizeCustomFoods = (foods) => {
       state: typeof food.state === "string" ? sanitizeText(food.state) : "User-entered serving basis",
       caloriesPer100g,
       proteinPer100g,
+      carbohydratesPer100g: food.carbohydratesPer100g == null || food.carbohydratesPer100g === "" ? null : Number(food.carbohydratesPer100g),
+      fatPer100g: food.fatPer100g == null || food.fatPer100g === "" ? null : Number(food.fatPer100g),
       source: "User-entered label or estimate",
       sourceUrl: ""
     }];
@@ -278,6 +283,12 @@ export default function App() {
   // User session & Plan
   const [user, setUser] = useState(null);
   const [cloudSyncReadyUserId, setCloudSyncReadyUserId] = useState(null);
+  const [syncStatus, setSyncStatus] = useState(cloudAccountsEnabled ? "restoring" : "local");
+  const [syncMessage, setSyncMessage] = useState(cloudAccountsEnabled ? "Restoring workspace..." : "Saved in this browser");
+  const [isOnline, setIsOnline] = useState(() =>
+    typeof navigator === "undefined" ? true : navigator.onLine
+  );
+  const syncRequestId = useRef(0);
   const [verifiedPlan, setVerifiedPlan] = useState({ userId: null, plan: "FREE", expiresAt: null });
   const userId = typeof user?.id === "string" ? user.id : null;
   const userPlan = verifiedPlan.userId === userId ? verifiedPlan.plan : "FREE";
@@ -370,31 +381,32 @@ export default function App() {
   }, [theme]);
 
   // Sync to LocalStorage
-  useEffect(() => localStorage.setItem("mealmate-started", JSON.stringify(started)), [started]);
-  useEffect(() => localStorage.setItem("mealmate-meals", JSON.stringify(meals)), [meals]);
-  useEffect(() => localStorage.setItem("mealmate-recipes", JSON.stringify(recipes)), [recipes]);
-  useEffect(() => localStorage.setItem("mealmate-groceries", JSON.stringify(groceries)), [groceries]);
-  useEffect(() => localStorage.setItem("mealmate-favorites", JSON.stringify(favorites)), [favorites]);
-  useEffect(() => localStorage.setItem("mealmate-budget", JSON.stringify(budget)), [budget]);
-  useEffect(() => localStorage.setItem("mealmate-expenses", JSON.stringify(expenses)), [expenses]);
+  useEffect(() => writeStore("mealmate-started", started), [started]);
+  useEffect(() => writeStore("mealmate-meals", meals), [meals]);
+  useEffect(() => writeStore("mealmate-recipes", recipes), [recipes]);
+  useEffect(() => writeStore("mealmate-groceries", groceries), [groceries]);
+  useEffect(() => writeStore("mealmate-favorites", favorites), [favorites]);
+  useEffect(() => writeStore("mealmate-budget", budget), [budget]);
+  useEffect(() => writeStore("mealmate-expenses", expenses), [expenses]);
   useEffect(() => {
-    localStorage.setItem("mealmate-cal-target", JSON.stringify(calorieTarget));
-    localStorage.setItem("mm-nutrition-targets", JSON.stringify(calorieTarget));
+    writeStore("mealmate-cal-target", calorieTarget);
+    writeStore("mm-nutrition-targets", calorieTarget);
   }, [calorieTarget]);
-  useEffect(() => localStorage.setItem("mealmate-serving-size", JSON.stringify(servingSize)), [servingSize]);
+  useEffect(() => writeStore("mealmate-serving-size", servingSize), [servingSize]);
   useEffect(() => {
-    localStorage.setItem("mealmate-nutrition", JSON.stringify(nutritionEntries));
-    localStorage.setItem("mm-food-logs", JSON.stringify(nutritionEntries));
+    writeStore("mealmate-nutrition", nutritionEntries);
+    writeStore("mm-food-logs", nutritionEntries);
   }, [nutritionEntries]);
   useEffect(() => {
-    localStorage.setItem("mealmate-nutrition-profile", JSON.stringify(nutritionProfile));
-    localStorage.setItem("mm-nutrition-profile", JSON.stringify(nutritionProfile));
+    writeStore("mealmate-nutrition-profile", nutritionProfile);
+    writeStore("mm-nutrition-profile", nutritionProfile);
   }, [nutritionProfile]);
   useEffect(() => {
-    localStorage.setItem("mealmate-custom-foods", JSON.stringify(customFoods));
-    localStorage.setItem("mm-custom-foods", JSON.stringify(customFoods));
+    writeStore("mealmate-custom-foods", customFoods);
+    writeStore("mm-custom-foods", customFoods);
   }, [customFoods]);
-  useEffect(() => localStorage.setItem("mealmate-feedback", JSON.stringify(feedbackEntries)), [feedbackEntries]);
+  useEffect(() => writeStore("mealmate-feedback", feedbackEntries), [feedbackEntries]);
+  useEffect(() => writeStore("mealmate-theme", theme), [theme]);
   const showNotification = (msg) => {
     setNotification(msg);
     setTimeout(() => setNotification(""), 3500);
@@ -432,13 +444,41 @@ export default function App() {
 
   // Background Cloud Sync when user is authenticated
   useEffect(() => {
-    if (cloudAccountsEnabled && user?.id && cloudSyncReadyUserId === user.id) {
-      const payload = { meals, recipes, groceries, expenses, budget, favorites, calorieTarget, servingSize };
-      syncUserDataToCloud(user.id, payload).catch((error) => {
-        showNotification(`Cloud workspace sync failed: ${error.message || "Please try again."}`);
-      });
+    if (!cloudAccountsEnabled || !user?.id || cloudSyncReadyUserId !== user.id) {
+      return undefined;
     }
-  }, [meals, recipes, groceries, expenses, budget, favorites, calorieTarget, servingSize, user, cloudSyncReadyUserId]);
+    if (!isOnline) {
+      return undefined;
+    }
+    const requestId = ++syncRequestId.current;
+    const payload = {
+      meals, recipes, groceries, expenses, budget, favorites, calorieTarget, servingSize,
+      nutritionEntries, nutritionProfile, customFoods, feedbackEntries, theme,
+      started
+    };
+    const timer = window.setTimeout(() => {
+      setSyncStatus("saving");
+      setSyncMessage("Saving changes...");
+      syncUserDataToCloud(user.id, payload)
+        .then(() => {
+          if (syncRequestId.current === requestId) {
+            setSyncStatus("saved");
+            setSyncMessage("Saved and synchronized");
+          }
+        })
+        .catch((error) => {
+          if (syncRequestId.current === requestId) {
+            setSyncStatus("error");
+            setSyncMessage(`Sync paused - local data is safe: ${error.message || "Please try again."}`);
+          }
+        });
+    }, 600);
+    return () => window.clearTimeout(timer);
+  }, [
+    meals, recipes, groceries, expenses, budget, favorites, calorieTarget, servingSize,
+    nutritionEntries, nutritionProfile, customFoods, feedbackEntries, theme, started,
+    user, cloudSyncReadyUserId, isOnline
+  ]);
 
   // Handle ESC key for closing modals
   useEffect(() => {
@@ -465,23 +505,46 @@ export default function App() {
   const handleLoginSuccess = async (userObj) => {
     setCloudSyncReadyUserId(null);
     setUser(userObj);
+    setSyncStatus("restoring");
+    setSyncMessage("Restoring cloud workspace...");
     setVerifiedPlan({ userId: null, plan: "FREE", expiresAt: null });
 
     try {
       const cloudData = await fetchUserDataFromCloud(userObj.id);
       if (cloudData) {
-        if (cloudData.meals) setMeals(clearLegacyDemoMealCalories(cloudData.meals));
-        if (cloudData.recipes) setRecipes(normalizeRecipes(cloudData.recipes));
-        if (cloudData.groceries) setGroceries(cloudData.groceries);
-        if (cloudData.expenses) setExpenses(cloudData.expenses);
-        if (cloudData.budget !== undefined) setBudget(cloudData.budget);
-        if (cloudData.favorites) setFavorites(cloudData.favorites);
-        if (cloudData.calorieTarget !== undefined) setCalorieTarget(cloudData.calorieTarget);
-        if (cloudData.servingSize !== undefined) setServingSize(cloudData.servingSize);
-        showNotification("Restored cloud workspace for " + userObj.name);
+        if (isCompleteWorkspaceData(cloudData)) {
+          setMeals(clearLegacyDemoMealCalories(cloudData.meals));
+          setRecipes(normalizeRecipes(cloudData.recipes));
+          setGroceries(cloudData.groceries);
+          setExpenses(cloudData.expenses);
+          setBudget(cloudData.budget);
+          setFavorites(cloudData.favorites);
+          if (cloudData.calorieTarget === null
+            || (typeof cloudData.calorieTarget === "number" && cloudData.calorieTarget > 0)) {
+            setCalorieTarget(cloudData.calorieTarget);
+          }
+          if (typeof cloudData.servingSize === "number" && [1, 2, 4, 6].includes(cloudData.servingSize)) {
+            setServingSize(cloudData.servingSize);
+          }
+          if (Array.isArray(cloudData.nutritionEntries)) setNutritionEntries(normalizeNutritionEntries(cloudData.nutritionEntries));
+          if (Array.isArray(cloudData.feedbackEntries)) setFeedbackEntries(normalizeFeedbackEntries(cloudData.feedbackEntries));
+          if (Array.isArray(cloudData.customFoods)) setCustomFoods(normalizeCustomFoods(cloudData.customFoods));
+          if (cloudData.nutritionProfile && typeof cloudData.nutritionProfile === "object") {
+            setNutritionProfile(normalizeNutritionProfile(cloudData.nutritionProfile));
+          }
+          if (cloudData.theme === "light" || cloudData.theme === "dark") handleThemeChange(cloudData.theme);
+          showNotification("Restored cloud workspace for " + userObj.name);
+        } else {
+          setSyncMessage("Incomplete cloud workspace - preserving local data");
+          showNotification("Cloud workspace was incomplete. Existing browser data was preserved.");
+        }
+      } else {
+        setSyncMessage("Migrating local workspace safely...");
       }
       setCloudSyncReadyUserId(userObj.id);
     } catch (error) {
+      setSyncStatus("error");
+      setSyncMessage(`Cloud restore paused - local data is safe: ${error.message}`);
       showNotification(
         `Signed in, but cloud workspace sync is paused to protect existing data: ${error.message}`
       );
@@ -508,6 +571,30 @@ export default function App() {
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    const handleOffline = () => {
+      setIsOnline(false);
+      setSyncStatus("offline");
+      setSyncMessage("Offline - changes remain saved locally");
+    };
+    const handleOnline = () => {
+      setIsOnline(true);
+      if (cloudAccountsEnabled && userId) {
+        setSyncStatus("saving");
+        setSyncMessage("Connection restored - synchronizing...");
+      } else {
+        setSyncStatus("local");
+        setSyncMessage("Saved in this browser");
+      }
+    };
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", handleOnline);
+    return () => {
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("online", handleOnline);
+    };
+  }, [userId]);
+
   const handleSignOut = async () => {
     try {
       const { error } = await signOutUser();
@@ -517,6 +604,8 @@ export default function App() {
       }
       setUser(null);
       setCloudSyncReadyUserId(null);
+      setSyncStatus(cloudAccountsEnabled ? "local" : "local");
+      setSyncMessage("Saved in this browser");
       setVerifiedPlan({ userId: null, plan: "FREE", expiresAt: null });
       showNotification("Signed out of MealMate workspace.");
     } catch (error) {
@@ -1040,12 +1129,26 @@ export default function App() {
     let protein = recipeForm.protein === "" || recipeForm.protein === null || recipeForm.protein === undefined
       ? null
       : Number(recipeForm.protein);
+    let carbohydrates = recipeForm.carbohydrates === "" || recipeForm.carbohydrates === null || recipeForm.carbohydrates === undefined
+      ? null
+      : Number(recipeForm.carbohydrates);
+    let fat = recipeForm.fat === "" || recipeForm.fat === null || recipeForm.fat === undefined
+      ? null
+      : Number(recipeForm.fat);
     if (calories !== null && (!Number.isFinite(calories) || calories < 0)) {
       showNotification("Calories must be a non-negative number or left blank.");
       return;
     }
     if (protein !== null && (!Number.isFinite(protein) || protein < 0)) {
       showNotification("Protein must be a non-negative number or left blank.");
+      return;
+    }
+    if (carbohydrates !== null && (!Number.isFinite(carbohydrates) || carbohydrates < 0)) {
+      showNotification("Carbohydrates must be a non-negative number or left blank.");
+      return;
+    }
+    if (fat !== null && (!Number.isFinite(fat) || fat < 0)) {
+      showNotification("Fat must be a non-negative number or left blank.");
       return;
     }
 
@@ -1070,6 +1173,12 @@ export default function App() {
     if (ingredientNutrition) {
       calories = Math.round(ingredientNutrition.caloriesPerServing);
       protein = Math.round(ingredientNutrition.proteinPerServing * 10) / 10;
+      carbohydrates = ingredientNutrition.carbohydratesPerServing === null
+        ? null
+        : Math.round(ingredientNutrition.carbohydratesPerServing * 10) / 10;
+      fat = ingredientNutrition.fatPerServing === null
+        ? null
+        : Math.round(ingredientNutrition.fatPerServing * 10) / 10;
     }
 
     const payload = {
@@ -1082,6 +1191,8 @@ export default function App() {
       time: Number(recipeForm.time) || 15,
       calories,
       protein,
+      carbohydrates,
+      fat,
       servings,
       nutritionIngredients,
       nutritionSource: ingredientNutrition
@@ -1611,6 +1722,9 @@ export default function App() {
         <footer className="app-footer" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
           <span>MealMate © 2026 · Eat better. Live brighter.</span>
           <LegalLinks onOpenLegal={openLegalModal} className="app-footer-links" />
+          <span role="status" aria-live="polite" title={syncMessage}>
+            {syncStatus === "offline" ? "Offline" : syncStatus === "error" ? "Sync needs attention" : syncStatus === "saving" ? "Saving..." : syncStatus === "restoring" ? "Restoring..." : "Saved"}
+          </span>
           <span>Made with care <b>♥</b> for healthy living.</span>
         </footer>
       </main>

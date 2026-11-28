@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { expensesInMonth } from "../src/utils/dateUtils.js";
+import { expensesInMonth, isCompleteWorkspaceData } from "../src/utils/dateUtils.js";
 import {
   clearLegacyDemoMealCalories,
   migrateLegacySeedDescription
@@ -26,6 +26,8 @@ test("unreferenced recipe nutrition is not shown as a numeric estimate", () => {
     {
       calories: null,
       protein: null,
+      carbohydrates: null,
+      fat: null,
       source: "Nutrition not provided (no recorded source)",
       estimated: true
     }
@@ -42,6 +44,22 @@ test("explicitly user-entered recipe nutrition remains identified as an estimate
   assert.equal(nutrition.calories, 400);
   assert.equal(nutrition.protein, 25);
   assert.match(nutrition.source, /user-entered/i);
+});
+
+test("cloud restore rejects empty and incomplete workspace payloads", () => {
+  assert.equal(isCompleteWorkspaceData({}), false);
+  assert.equal(isCompleteWorkspaceData({
+    meals: [],
+    recipes: []
+  }), false);
+  assert.equal(isCompleteWorkspaceData({
+    meals: [],
+    recipes: [],
+    groceries: [],
+    expenses: [],
+    favorites: [],
+    budget: 8000
+  }), true);
 });
 
 test("legacy demo meal calories are cleared without overwriting edited meal data", () => {

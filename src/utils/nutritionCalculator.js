@@ -178,12 +178,26 @@ export const calculateRecipeIngredientNutrition = (nutritionIngredients, serving
     (total, { ingredient, food }) => total + (food.proteinPer100g * Number(ingredient.grams) / 100),
     0
   );
+  const totalCarbohydrates = resolvedIngredients.reduce(
+    (total, { ingredient, food }) => total + (Number(food.carbohydratesPer100g || 0) * Number(ingredient.grams) / 100),
+    0
+  );
+  const totalFat = resolvedIngredients.reduce(
+    (total, { ingredient, food }) => total + (Number(food.fatPer100g || 0) * Number(ingredient.grams) / 100),
+    0
+  );
+  const hasCarbohydrateData = resolvedIngredients.every(({ food }) => Number.isFinite(Number(food.carbohydratesPer100g)));
+  const hasFatData = resolvedIngredients.every(({ food }) => Number.isFinite(Number(food.fatPer100g)));
 
   return {
     totalCalories,
     totalProtein,
+    totalCarbohydrates: hasCarbohydrateData ? totalCarbohydrates : null,
+    totalFat: hasFatData ? totalFat : null,
     caloriesPerServing: totalCalories / servingCount,
     proteinPerServing: totalProtein / servingCount,
+    carbohydratesPerServing: hasCarbohydrateData ? totalCarbohydrates / servingCount : null,
+    fatPerServing: hasFatData ? totalFat / servingCount : null,
     ingredientCount: resolvedIngredients.length,
     hasUserEnteredFood: resolvedIngredients.some(({ food }) => food.source !== "USDA FoodData Central, SR Legacy")
   };

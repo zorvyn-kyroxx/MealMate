@@ -152,6 +152,30 @@ export default function RecipeModal({
           </label>
 
           <label>
+            Carbohydrates per serving (g)
+            <input
+              type="number"
+              min="0"
+              step="0.1"
+              value={recipeForm.carbohydrates ?? ""}
+              onChange={(event) => setRecipeForm({ ...recipeForm, carbohydrates: event.target.value })}
+              placeholder="Only if known"
+            />
+          </label>
+
+          <label>
+            Fat per serving (g)
+            <input
+              type="number"
+              min="0"
+              step="0.1"
+              value={recipeForm.fat ?? ""}
+              onChange={(event) => setRecipeForm({ ...recipeForm, fat: event.target.value })}
+              placeholder="Only if known"
+            />
+          </label>
+
+          <label>
             Total servings
             <input
               type="number"
