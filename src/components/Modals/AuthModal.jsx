@@ -1,6 +1,14 @@
 import { useState } from "react";
 import { X, Lock, Mail, User, Shield, Cloud } from "lucide-react";
-import { isSupabaseConfigured, signInWithEmail, signUpWithEmail } from "../../services/supabaseClient";
+import {
+  isSupabaseConfigured,
+  resendSignupConfirmation,
+  signInWithEmail,
+  signUpWithEmail
+} from "../../services/supabaseClient";
+import { getSignUpOutcome } from "../../utils/auth";
+
+const confirmationRequiredMessage = "Your account has been created successfully! Please check your email inbox (Gmail) and click the verification link to activate your MealMate account. If the email isn't visible, check your Spam/Junk folder.";
 
 export default function AuthModal({
   isOpen,
@@ -15,6 +23,7 @@ export default function AuthModal({
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
+  const [pendingConfirmationEmail, setPendingConfirmationEmail] = useState("");
 
   if (!isOpen) return null;
 
@@ -47,23 +56,31 @@ export default function AuthModal({
         if (error) {
           throw error;
         }
-        if (!data?.user) throw new Error("Supabase did not return a user after sign-up.");
-        if (Array.isArray(data.user.identities) && data.user.identities.length === 0) {
-          setErrorMessage("An account with this email already exists. Sign in instead.");
-          return;
-        }
-        if (!data.session) {
+        const signupOutcome = getSignUpOutcome(data);
+        if (signupOutcome === "duplicate") {
+          setPendingConfirmationEmail(normalizedEmail);
+          setEmail(normalizedEmail);
           setIsRegister(false);
-          setStatusMessage("Account created. Check your email to confirm the address, then sign in.");
+          setStatusMessage("We couldn't complete signup for this address. If you recently signed up, request a confirmation email below. If you already have an account, sign in instead.");
           return;
         }
+        if (signupOutcome === "confirmation-required") {
+          setPendingConfirmationEmail(normalizedEmail);
+          setEmail(normalizedEmail);
+          setPassword("");
+          setIsRegister(false);
+          setStatusMessage(confirmationRequiredMessage);
+          return;
+        }
+
+        setPendingConfirmationEmail("");
         const userObj = data.user;
         await onLoginSuccess({
           id: userObj.id,
           email: userObj.email,
           name: userObj.user_metadata?.full_name || name.trim() || normalizedEmail.split("@")[0]
         });
-        showNotification("Account created successfully!");
+        showNotification("Account created successfully. Email confirmation is not required, and you're signed in.");
         onClose();
       } else {
         const { data, error } = await signInWithEmail(normalizedEmail, password);
@@ -71,6 +88,7 @@ export default function AuthModal({
           throw error;
         }
         if (!data?.user) throw new Error("Supabase did not return a user after sign-in.");
+        setPendingConfirmationEmail("");
         const userObj = data.user;
         await onLoginSuccess({
           id: userObj.id,
@@ -83,14 +101,47 @@ export default function AuthModal({
     } catch (error) {
       const code = error?.code || "";
       const message = error?.message || "";
-      if (code === "invalid_credentials" || /invalid login credentials/i.test(message)) {
+      if (code === "email_not_confirmed") {
+        setPendingConfirmationEmail(normalizedEmail);
+        setEmail(normalizedEmail);
+        setIsRegister(false);
+        setStatusMessage("This email address hasn't been confirmed yet. Check your inbox (Gmail) and click the verification link. If it isn't visible, check your Spam/Junk folder.");
+      } else if (code === "invalid_credentials" || /invalid login credentials/i.test(message)) {
         setErrorMessage("Email or password is incorrect. Check your details and try again.");
-      } else if (["email_exists", "user_already_exists"].includes(code) || /already registered|already exists/i.test(message)) {
-        setErrorMessage("An account with this email already exists. Sign in instead.");
+      } else if (isRegister && (["email_exists", "user_already_exists"].includes(code) || /already registered|already exists/i.test(message))) {
+        setPendingConfirmationEmail(normalizedEmail);
+        setEmail(normalizedEmail);
+        setIsRegister(false);
+        setStatusMessage("We couldn't complete signup for this address. If you recently signed up, request a confirmation email below. If you already have an account, sign in instead.");
       } else if (error?.name === "AuthRetryableFetchError" || /network|fetch failed|failed to fetch/i.test(message)) {
         setErrorMessage("Could not reach Supabase. Check your connection and try again.");
       } else {
         setErrorMessage(message || "Authentication failed. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    if (loading || !pendingConfirmationEmail) return;
+    setErrorMessage("");
+    setStatusMessage("");
+    setLoading(true);
+
+    try {
+      const { error } = await resendSignupConfirmation(pendingConfirmationEmail);
+      if (error) throw error;
+      setStatusMessage("If this address has a pending signup, a confirmation email should arrive shortly. Check your Gmail inbox and Spam/Junk folder.");
+    } catch (error) {
+      const code = error?.code || "";
+      const message = error?.message || "";
+      if (code === "over_email_send_rate_limit" || error?.status === 429) {
+        setErrorMessage("Too many email requests. Please wait a few minutes before trying again.");
+      } else if (error?.name === "AuthRetryableFetchError" || /network|fetch failed|failed to fetch/i.test(message)) {
+        setErrorMessage("Could not reach Supabase. Check your connection and try again.");
+      } else {
+        setErrorMessage("We couldn't request a confirmation email right now. Please try again later.");
       }
     } finally {
       setLoading(false);
@@ -207,6 +258,19 @@ export default function AuthModal({
             {statusMessage}
           </div>
         )}
+        {pendingConfirmationEmail && (
+          <div style={{ marginBottom: 14 }}>
+            <button
+              className="btn btn-outline"
+              type="button"
+              disabled={loading}
+              onClick={handleResendConfirmation}
+              style={{ width: "100%" }}
+            >
+              {loading ? "Sending confirmation email..." : "Resend confirmation email"}
+            </button>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
           {isRegister && (
@@ -235,7 +299,14 @@ export default function AuthModal({
                 type="email"
                 disabled={loading}
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  const nextEmail = e.target.value;
+                  setEmail(nextEmail);
+                  if (pendingConfirmationEmail && nextEmail.trim().toLowerCase() !== pendingConfirmationEmail) {
+                    setPendingConfirmationEmail("");
+                    setStatusMessage("");
+                  }
+                }}
                 placeholder="name@example.com"
                 style={{ paddingLeft: 34 }}
               />

@@ -67,6 +67,22 @@ export async function signUpWithEmail(email, password, displayName = "") {
   return { data, error };
 }
 
+export async function resendSignupConfirmation(email) {
+  if (!isSupabaseConfigured || !supabase) {
+    return {
+      data: null,
+      error: new Error("Email confirmation is unavailable until Supabase is configured.")
+    };
+  }
+
+  const { data, error } = await supabase.auth.resend({
+    type: "signup",
+    email
+  });
+
+  return { data, error };
+}
+
 /**
  * Sign in an existing user
  */
