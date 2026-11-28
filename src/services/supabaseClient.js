@@ -1,26 +1,15 @@
 import { createClient } from "@supabase/supabase-js";
+import { normalizeSupabaseUrl } from "../utils/supabaseUrl";
 
 // Retrieve environment variables (accept both standard anon and publishable key names)
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseUrl = normalizeSupabaseUrl(import.meta.env.VITE_SUPABASE_URL);
 const supabaseBrowserKey = [
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
   import.meta.env.VITE_SUPABASE_ANON_KEY
 ].find((key) => key && !/your-|placeholder/i.test(key));
 
-const hasValidSupabaseUrl = (() => {
-  if (!supabaseUrl || /your-project|placeholder/i.test(supabaseUrl)) return false;
-  try {
-    const parsedUrl = new URL(supabaseUrl);
-    return parsedUrl.protocol === "https:" ||
-      (parsedUrl.protocol === "http:" && ["localhost", "127.0.0.1"].includes(parsedUrl.hostname));
-  } catch {
-    return false;
-  }
-})();
-
 export const isSupabaseConfigured = Boolean(
-  hasValidSupabaseUrl &&
-  supabaseBrowserKey
+  supabaseUrl && supabaseBrowserKey
 );
 
 // No client is created when public Supabase configuration is unavailable.

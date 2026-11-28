@@ -34,7 +34,7 @@ export default function AuthModal({
     setStatusMessage("");
 
     if (!isSupabaseConfigured) {
-      setErrorMessage("Supabase authentication is not configured. Set VITE_SUPABASE_URL and either VITE_SUPABASE_ANON_KEY or VITE_SUPABASE_PUBLISHABLE_KEY in the deployment environment.");
+      setErrorMessage("Supabase authentication is not configured correctly. Set VITE_SUPABASE_URL to the project URL (not an /auth/v1 or /rest/v1 endpoint), and set either VITE_SUPABASE_ANON_KEY or VITE_SUPABASE_PUBLISHABLE_KEY.");
       return;
     }
 
@@ -115,6 +115,8 @@ export default function AuthModal({
         setStatusMessage("We couldn't complete signup for this address. If you recently signed up, request a confirmation email below. If you already have an account, sign in instead.");
       } else if (error?.name === "AuthRetryableFetchError" || /network|fetch failed|failed to fetch/i.test(message)) {
         setErrorMessage("Could not reach Supabase. Check your connection and try again.");
+      } else if (/invalid path specified in request url/i.test(message)) {
+        setErrorMessage("Supabase rejected the request path. Check that VITE_SUPABASE_URL is the project URL, not a nested Auth or REST endpoint.");
       } else {
         setErrorMessage(message || "Authentication failed. Please try again.");
       }

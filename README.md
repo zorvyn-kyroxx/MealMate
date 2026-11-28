@@ -11,7 +11,7 @@ Configure these Vite environment variables locally in `.env.local` and in Vercel
 - `VITE_SUPABASE_URL`
 - Either `VITE_SUPABASE_ANON_KEY` or `VITE_SUPABASE_PUBLISHABLE_KEY`
 
-With a valid URL and public anon/publishable key, sign-in and registration are available. Apply `supabase_schema.sql` in the Supabase SQL Editor, apply the migrations, and configure email confirmation and allowed redirect URLs. The workspace policies restrict reads and writes to the authenticated owner, and authenticated browser clients cannot update the workspace plan column. Never put a Supabase service-role key or Razorpay secret in a frontend `VITE_` variable.
+`VITE_SUPABASE_URL` must be the project base URL (for example, `https://<project-ref>.supabase.co`), not an `/auth/v1` or `/rest/v1` endpoint. With a valid URL and public anon/publishable key, sign-in and registration are available. Apply `supabase_schema.sql` in the Supabase SQL Editor, apply the migrations, and configure email confirmation and allowed redirect URLs. The workspace policies restrict reads and writes to the authenticated owner, and authenticated browser clients cannot update the workspace plan column. Never put a Supabase service-role key or Razorpay secret in a frontend `VITE_` variable.
 
 Without these values, Login/Register still opens and explains the missing configuration; workspace data remains in browser storage.
 
