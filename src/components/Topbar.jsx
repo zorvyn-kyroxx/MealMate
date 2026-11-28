@@ -57,9 +57,8 @@ export default function Topbar({
           type="button"
           className="avatar top-avatar"
           style={{ cursor: "pointer", border: 0 }}
-          title={user ? `${user.name} (${user.email})` : accountAccessEnabled ? "Sign in to MealMate" : "Account access disabled in beta"}
-          aria-label={user ? `Signed in as ${user.name || user.email}` : accountAccessEnabled ? "Sign in to MealMate" : "Account access disabled in beta"}
-          disabled={!accountAccessEnabled}
+          title={user ? `${user.name} (${user.email})` : accountAccessEnabled ? "Sign in to MealMate" : "Configure Supabase to enable account access"}
+          aria-label={user ? `Signed in as ${user.name || user.email}` : "Sign in to MealMate"}
           onClick={onOpenAuth}
         >
           {user ? (user.name ? user.name[0].toUpperCase() : "M") : <UserIcon size={14} aria-hidden="true" />}

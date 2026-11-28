@@ -28,22 +28,33 @@ create table if not exists public.payments (
 alter table public.user_workspaces enable row level security;
 alter table public.payments enable row level security;
 
+-- Browser clients may manage workspace data but cannot change the paid plan column.
+revoke all on table public.user_workspaces from anon, authenticated;
+grant select on table public.user_workspaces to authenticated;
+grant insert (user_id, data, updated_at) on public.user_workspaces to authenticated;
+grant update (user_id, data, updated_at) on public.user_workspaces to authenticated;
+
 -- 4. RLS Policies for user_workspaces (Only owner can read/write)
+drop policy if exists "Users can view their own workspace data" on public.user_workspaces;
 create policy "Users can view their own workspace data"
-  on public.user_workspaces for select
+  on public.user_workspaces for select to authenticated
   using (auth.uid() = user_id);
 
+drop policy if exists "Users can insert their own workspace data" on public.user_workspaces;
 create policy "Users can insert their own workspace data"
-  on public.user_workspaces for insert
+  on public.user_workspaces for insert to authenticated
   with check (auth.uid() = user_id);
 
+drop policy if exists "Users can update their own workspace data" on public.user_workspaces;
 create policy "Users can update their own workspace data"
-  on public.user_workspaces for update
-  using (auth.uid() = user_id);
+  on public.user_workspaces for update to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
 
 -- 5. RLS Policies for payments (Users can only view their own receipts)
+drop policy if exists "Users can view their own payments" on public.payments;
 create policy "Users can view their own payments"
-  on public.payments for select
+  on public.payments for select to authenticated
   using (auth.uid() = user_id);
 
 -- 6. Trigger to auto-create workspace entry on signup

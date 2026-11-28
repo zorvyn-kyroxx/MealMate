@@ -18,7 +18,8 @@ import {
 
 // Supabase Cloud Sync Service
 import {
-  syncUserDataToCloud, fetchUserDataFromCloud, signOutUser, isSupabaseConfigured
+  syncUserDataToCloud, fetchUserDataFromCloud, signOutUser, getCurrentAuthUser,
+  isSupabaseConfigured
 } from "./services/supabaseClient";
 
 // Core Shell & Dashboard (loaded eagerly for instant first paint)
@@ -61,10 +62,7 @@ const UpgradeModal = lazy(() => import("./components/Modals/UpgradeModal"));
 const LegalModal = lazy(() => import("./components/Modals/LegalModal"));
 const PaymentModal = lazy(() => import("./components/Modals/PaymentModal"));
 
-const cloudAccountsEnabled =
-  import.meta.env.VITE_CLOUD_ACCOUNTS_ENABLED === "true" && isSupabaseConfigured;
-const accountCreationEnabled =
-  cloudAccountsEnabled && import.meta.env.VITE_ACCOUNT_CREATION_ENABLED === "true";
+const cloudAccountsEnabled = isSupabaseConfigured;
 const paymentsEnabled = false;
 
 const defaultNutritionProfile = {
@@ -278,11 +276,8 @@ export default function App() {
   const [theme, setTheme] = useState(() => readStore("mealmate-theme", "light"));
 
   // User session & Plan
-  const [user, setUser] = useState(() => {
-    if (!cloudAccountsEnabled) return null;
-    const savedUser = readStore("mealmate-user", null);
-    return typeof savedUser?.id === "string" && savedUser.id.startsWith("local-") ? null : savedUser;
-  });
+  const [user, setUser] = useState(null);
+  const [cloudSyncReadyUserId, setCloudSyncReadyUserId] = useState(null);
   const [verifiedPlan, setVerifiedPlan] = useState({ userId: null, plan: "FREE", expiresAt: null });
   const userId = typeof user?.id === "string" ? user.id : null;
   const userPlan = verifiedPlan.userId === userId ? verifiedPlan.plan : "FREE";
@@ -376,7 +371,6 @@ export default function App() {
 
   // Sync to LocalStorage
   useEffect(() => localStorage.setItem("mealmate-started", JSON.stringify(started)), [started]);
-  useEffect(() => localStorage.setItem("mealmate-user", JSON.stringify(user)), [user]);
   useEffect(() => localStorage.setItem("mealmate-meals", JSON.stringify(meals)), [meals]);
   useEffect(() => localStorage.setItem("mealmate-recipes", JSON.stringify(recipes)), [recipes]);
   useEffect(() => localStorage.setItem("mealmate-groceries", JSON.stringify(groceries)), [groceries]);
@@ -401,6 +395,10 @@ export default function App() {
     localStorage.setItem("mm-custom-foods", JSON.stringify(customFoods));
   }, [customFoods]);
   useEffect(() => localStorage.setItem("mealmate-feedback", JSON.stringify(feedbackEntries)), [feedbackEntries]);
+  const showNotification = (msg) => {
+    setNotification(msg);
+    setTimeout(() => setNotification(""), 3500);
+  };
   useEffect(() => {
     let active = true;
     if (!cloudAccountsEnabled || !userId || userId.startsWith("local-")) return () => { active = false; };
@@ -434,11 +432,13 @@ export default function App() {
 
   // Background Cloud Sync when user is authenticated
   useEffect(() => {
-    if (cloudAccountsEnabled && user && user.id) {
+    if (cloudAccountsEnabled && user?.id && cloudSyncReadyUserId === user.id) {
       const payload = { meals, recipes, groceries, expenses, budget, favorites, calorieTarget, servingSize };
-      syncUserDataToCloud(user.id, payload);
+      syncUserDataToCloud(user.id, payload).catch((error) => {
+        showNotification(`Cloud workspace sync failed: ${error.message || "Please try again."}`);
+      });
     }
-  }, [meals, recipes, groceries, expenses, budget, favorites, calorieTarget, servingSize, user]);
+  }, [meals, recipes, groceries, expenses, budget, favorites, calorieTarget, servingSize, user, cloudSyncReadyUserId]);
 
   // Handle ESC key for closing modals
   useEffect(() => {
@@ -452,11 +452,6 @@ export default function App() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const showNotification = (msg) => {
-    setNotification(msg);
-    setTimeout(() => setNotification(""), 3500);
-  };
-
   const handleThemeChange = (nextTheme) => {
     setTheme(nextTheme);
     try {
@@ -468,26 +463,65 @@ export default function App() {
 
   // Auth & Session Handlers
   const handleLoginSuccess = async (userObj) => {
-    setVerifiedPlan({ userId: null, plan: "FREE", expiresAt: null });
+    setCloudSyncReadyUserId(null);
     setUser(userObj);
+    setVerifiedPlan({ userId: null, plan: "FREE", expiresAt: null });
 
-    // Try fetching existing cloud state
-    const cloudData = await fetchUserDataFromCloud(userObj.id);
-    if (cloudData) {
-      if (cloudData.meals) setMeals(clearLegacyDemoMealCalories(cloudData.meals));
-      if (cloudData.recipes) setRecipes(normalizeRecipes(cloudData.recipes));
-      if (cloudData.groceries) setGroceries(cloudData.groceries);
-      if (cloudData.expenses) setExpenses(cloudData.expenses);
-      if (cloudData.budget) setBudget(cloudData.budget);
-      showNotification("Restored cloud workspace for " + userObj.name);
+    try {
+      const cloudData = await fetchUserDataFromCloud(userObj.id);
+      if (cloudData) {
+        if (cloudData.meals) setMeals(clearLegacyDemoMealCalories(cloudData.meals));
+        if (cloudData.recipes) setRecipes(normalizeRecipes(cloudData.recipes));
+        if (cloudData.groceries) setGroceries(cloudData.groceries);
+        if (cloudData.expenses) setExpenses(cloudData.expenses);
+        if (cloudData.budget !== undefined) setBudget(cloudData.budget);
+        if (cloudData.favorites) setFavorites(cloudData.favorites);
+        if (cloudData.calorieTarget !== undefined) setCalorieTarget(cloudData.calorieTarget);
+        if (cloudData.servingSize !== undefined) setServingSize(cloudData.servingSize);
+        showNotification("Restored cloud workspace for " + userObj.name);
+      }
+      setCloudSyncReadyUserId(userObj.id);
+    } catch (error) {
+      showNotification(
+        `Signed in, but cloud workspace sync is paused to protect existing data: ${error.message}`
+      );
     }
   };
 
+  useEffect(() => {
+    if (!cloudAccountsEnabled) return undefined;
+    let active = true;
+    getCurrentAuthUser()
+      .then((authUser) => {
+        if (!active || !authUser) return;
+        return handleLoginSuccess({
+          id: authUser.id,
+          email: authUser.email,
+          name: authUser.user_metadata?.full_name || authUser.email?.split("@")[0] || "MealMate Member"
+        });
+      })
+      .catch((error) => {
+        if (active) {
+          showNotification(`Could not restore your sign-in session: ${error.message}`);
+        }
+      });
+    return () => { active = false; };
+  }, []);
+
   const handleSignOut = async () => {
-    await signOutUser();
-    setUser(null);
-    setVerifiedPlan({ userId: null, plan: "FREE", expiresAt: null });
-    showNotification("Signed out of MealMate workspace.");
+    try {
+      const { error } = await signOutUser();
+      if (error) {
+        showNotification(`Could not sign out: ${error.message}`);
+        return;
+      }
+      setUser(null);
+      setCloudSyncReadyUserId(null);
+      setVerifiedPlan({ userId: null, plan: "FREE", expiresAt: null });
+      showNotification("Signed out of MealMate workspace.");
+    } catch (error) {
+      showNotification(`Could not sign out: ${error.message || "Please try again."}`);
+    }
   };
 
   const openLegalModal = (tab = "terms") => {
@@ -1640,8 +1674,6 @@ export default function App() {
           onClose={() => setModal("")}
           onLoginSuccess={handleLoginSuccess}
           showNotification={showNotification}
-          accountCreationEnabled={accountCreationEnabled}
-          accountAccessEnabled={cloudAccountsEnabled}
         />
 
         <UpgradeModal

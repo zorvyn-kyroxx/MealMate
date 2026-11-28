@@ -90,7 +90,7 @@ export default function Sidebar({
             <>
               <div className="promo-spark"><Sparkles size={16} /></div>
               <strong>Public beta</strong>
-              <p>Accounts, payments, and advertising are disabled by default.</p>
+              <p>Sign-in and cloud sync require Supabase configuration. Payments and advertising are disabled.</p>
             </>
           ) : (
             <>
@@ -122,10 +122,10 @@ export default function Sidebar({
                 <button
                   type="button"
                   style={{ border: 0, background: "none", color: "var(--green)", fontWeight: 700, padding: 0, cursor: "pointer", fontSize: 11, textAlign: "left" }}
-                  disabled={!accountAccessEnabled}
                   onClick={onOpenAuth}
+                  title={accountAccessEnabled ? "Sign in or register" : "Configure Supabase to enable account access"}
                 >
-                  {accountAccessEnabled ? "Sign In / Register" : "Accounts disabled in beta"}
+                  Sign In / Register
                 </button>
                 <span>Local Workspace</span>
               </>
@@ -145,9 +145,8 @@ export default function Sidebar({
             <button
               type="button"
               className="row-action-btn"
-              title={accountAccessEnabled ? "Sign in or register" : "Account access disabled in beta"}
-              aria-label={accountAccessEnabled ? "Sign in or register" : "Account access disabled in beta"}
-              disabled={!accountAccessEnabled}
+              title={accountAccessEnabled ? "Sign in or register" : "Configure Supabase to enable account access"}
+              aria-label="Sign in or register"
               onClick={onOpenAuth}
               style={{ width: 28, height: 28 }}
             >

@@ -6,9 +6,7 @@ export default function AuthModal({
   isOpen,
   onClose,
   onLoginSuccess,
-  showNotification,
-  accountCreationEnabled = false,
-  accountAccessEnabled = false
+  showNotification
 }) {
   const [isRegister, setIsRegister] = useState(false);
   const [name, setName] = useState("");
@@ -16,29 +14,23 @@ export default function AuthModal({
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [statusMessage, setStatusMessage] = useState("");
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return;
     setErrorMessage("");
-
-    if (!accountAccessEnabled) {
-      setErrorMessage("Account access and cloud sync are disabled during the public beta.");
-      return;
-    }
-
-    if (isRegister && !accountCreationEnabled) {
-      setErrorMessage("Account creation is paused during the beta while privacy and parental-consent safeguards are being prepared.");
-      return;
-    }
+    setStatusMessage("");
 
     if (!isSupabaseConfigured) {
-      setErrorMessage("Sign-in is unavailable until Supabase authentication is configured.");
+      setErrorMessage("Supabase authentication is not configured. Set VITE_SUPABASE_URL and either VITE_SUPABASE_ANON_KEY or VITE_SUPABASE_PUBLISHABLE_KEY in the deployment environment.");
       return;
     }
 
-    if (!email.trim() || !password.trim()) {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || !password) {
       setErrorMessage("Please enter both email and password.");
       return;
     }
@@ -51,38 +43,55 @@ export default function AuthModal({
     setLoading(true);
     try {
       if (isRegister) {
-        const { data, error } = await signUpWithEmail(email, password, name);
+        const { data, error } = await signUpWithEmail(normalizedEmail, password, name.trim());
         if (error) {
-          setErrorMessage(error.message);
-        } else {
-          const userObj = data.user;
-          onLoginSuccess({
-            id: userObj.id,
-            email: userObj.email,
-            name: userObj.user_metadata?.full_name || name || email.split("@")[0],
-            plan: "FREE"
-          });
-          showNotification("Account created successfully!");
-          onClose();
+          throw error;
         }
+        if (!data?.user) throw new Error("Supabase did not return a user after sign-up.");
+        if (Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+          setErrorMessage("An account with this email already exists. Sign in instead.");
+          return;
+        }
+        if (!data.session) {
+          setIsRegister(false);
+          setStatusMessage("Account created. Check your email to confirm the address, then sign in.");
+          return;
+        }
+        const userObj = data.user;
+        await onLoginSuccess({
+          id: userObj.id,
+          email: userObj.email,
+          name: userObj.user_metadata?.full_name || name.trim() || normalizedEmail.split("@")[0]
+        });
+        showNotification("Account created successfully!");
+        onClose();
       } else {
-        const { data, error } = await signInWithEmail(email, password);
+        const { data, error } = await signInWithEmail(normalizedEmail, password);
         if (error) {
-          setErrorMessage(error.message);
-        } else {
-          const userObj = data.user;
-          onLoginSuccess({
-            id: userObj.id,
-            email: userObj.email,
-            name: userObj.user_metadata?.full_name || email.split("@")[0],
-            plan: "FREE"
-          });
-          showNotification("Signed in successfully!");
-          onClose();
+          throw error;
         }
+        if (!data?.user) throw new Error("Supabase did not return a user after sign-in.");
+        const userObj = data.user;
+        await onLoginSuccess({
+          id: userObj.id,
+          email: userObj.email,
+          name: userObj.user_metadata?.full_name || normalizedEmail.split("@")[0]
+        });
+        showNotification("Signed in successfully!");
+        onClose();
       }
-    } catch {
-      setErrorMessage("An unexpected error occurred. Please try again.");
+    } catch (error) {
+      const code = error?.code || "";
+      const message = error?.message || "";
+      if (code === "invalid_credentials" || /invalid login credentials/i.test(message)) {
+        setErrorMessage("Email or password is incorrect. Check your details and try again.");
+      } else if (["email_exists", "user_already_exists"].includes(code) || /already registered|already exists/i.test(message)) {
+        setErrorMessage("An account with this email already exists. Sign in instead.");
+      } else if (error?.name === "AuthRetryableFetchError" || /network|fetch failed|failed to fetch/i.test(message)) {
+        setErrorMessage("Could not reach Supabase. Check your connection and try again.");
+      } else {
+        setErrorMessage(message || "Authentication failed. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -105,26 +114,26 @@ export default function AuthModal({
         <div style={{
           padding: "8px 12px",
           borderRadius: "8px",
-          background: accountAccessEnabled && isSupabaseConfigured ? "var(--green-soft)" : "#fff8e6",
-          border: `1px solid ${accountAccessEnabled && isSupabaseConfigured ? "#c8dec7" : "#fae09c"}`,
+          background: isSupabaseConfigured ? "var(--green-soft)" : "#fff8e6",
+          border: `1px solid ${isSupabaseConfigured ? "#c8dec7" : "#fae09c"}`,
           display: "flex",
           alignItems: "center",
           gap: 8,
           marginBottom: 16,
           fontSize: 10,
           fontWeight: 700,
-          color: accountAccessEnabled && isSupabaseConfigured ? "#385940" : "#8c6b12"
+          color: isSupabaseConfigured ? "#385940" : "#8c6b12"
         }}>
           <Cloud size={14} />
           <span>
-            {accountAccessEnabled && isSupabaseConfigured
-              ? "Cloud Database Synced (Supabase Active)"
-              : "Account access and cloud sync are disabled during beta"}
+            {isSupabaseConfigured
+              ? "Supabase authentication is available"
+              : "Supabase authentication is not configured"}
           </span>
         </div>
-        {!accountAccessEnabled && (
+        {!isSupabaseConfigured && (
           <p role="status" style={{ margin: "0 0 16px", fontSize: 11, color: "var(--muted)", lineHeight: 1.5 }}>
-            MealMate works without an account. Your workspace stays in this browser; clearing its storage can erase saved data.
+            Add the Supabase project URL and an anon or publishable key to enable sign-in and account creation. The key must never be a service-role key.
           </p>
         )}
 
@@ -144,11 +153,12 @@ export default function AuthModal({
               color: !isRegister ? "var(--text)" : "var(--muted)",
               boxShadow: !isRegister ? "0 2px 8px rgba(0,0,0,0.06)" : "none"
             }}
-            onClick={() => { setIsRegister(false); setErrorMessage(""); }}
+            disabled={loading}
+            onClick={() => { setIsRegister(false); setErrorMessage(""); setStatusMessage(""); }}
           >
             Sign In
           </button>
-          {accountCreationEnabled && <button
+          <button
             type="button"
             style={{
               flex: 1,
@@ -162,22 +172,15 @@ export default function AuthModal({
               color: isRegister ? "var(--text)" : "var(--muted)",
               boxShadow: isRegister ? "0 2px 8px rgba(0,0,0,0.06)" : "none"
             }}
-            onClick={() => { setIsRegister(true); setErrorMessage(""); }}
+            disabled={loading}
+            onClick={() => { setIsRegister(true); setErrorMessage(""); setStatusMessage(""); }}
           >
             Register
-          </button>}
+          </button>
         </div>
 
-        {!accountCreationEnabled && (
-          <p role="status" style={{ margin: "0 0 16px", fontSize: 11, color: "var(--muted)", lineHeight: 1.5 }}>
-            {accountAccessEnabled
-              ? "New account creation is paused while privacy and parental-consent safeguards are prepared."
-              : "Account access and new registrations are paused while privacy and parental-consent safeguards are prepared."}
-          </p>
-        )}
-
         {errorMessage && (
-          <div style={{
+          <div role="alert" style={{
             padding: "9px 13px",
             borderRadius: 8,
             background: "#fff1f1",
@@ -190,6 +193,20 @@ export default function AuthModal({
             {errorMessage}
           </div>
         )}
+        {statusMessage && (
+          <div role="status" style={{
+            padding: "9px 13px",
+            borderRadius: 8,
+            background: "var(--green-soft)",
+            border: "1px solid #c8dec7",
+            color: "var(--green-dark)",
+            fontSize: 11,
+            fontWeight: 600,
+            marginBottom: 14
+          }}>
+            {statusMessage}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
           {isRegister && (
@@ -199,7 +216,7 @@ export default function AuthModal({
                 <input
                   required
                   type="text"
-                  disabled={!accountAccessEnabled || !isSupabaseConfigured}
+                  disabled={loading}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Alex Johnson"
@@ -216,7 +233,7 @@ export default function AuthModal({
               <input
                 required
                 type="email"
-                disabled={!accountAccessEnabled || !isSupabaseConfigured}
+                disabled={loading}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@example.com"
@@ -232,7 +249,7 @@ export default function AuthModal({
               <input
                 required
                 type="password"
-                disabled={!accountAccessEnabled || !isSupabaseConfigured}
+                disabled={loading}
                 minLength={6}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -246,25 +263,24 @@ export default function AuthModal({
           <button
             className="btn btn-green modal-submit"
             type="submit"
-            disabled={loading || !accountAccessEnabled || !isSupabaseConfigured}
+            disabled={loading}
             style={{ marginTop: 10, width: "100%" }}
           >
             {loading ? "Processing..." : isRegister ? "Create Account" : "Sign In to Workspace"}
           </button>
         </form>
 
-          {accountCreationEnabled && (
             <p style={{ margin: "16px 0 0", textAlign: "center", fontSize: 10, color: "var(--muted)" }}>
               {isRegister ? "Already registered?" : "Don't have an account yet?"}{" "}
               <button
                 type="button"
                 style={{ border: 0, background: "none", color: "var(--green)", fontWeight: 700, cursor: "pointer", padding: 0 }}
-                onClick={() => { setIsRegister(!isRegister); setErrorMessage(""); }}
+                disabled={loading}
+                onClick={() => { setIsRegister(!isRegister); setErrorMessage(""); setStatusMessage(""); }}
               >
                 {isRegister ? "Sign in instead" : "Create one now"}
               </button>
             </p>
-          )}
       </div>
     </div>
   );

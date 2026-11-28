@@ -2,22 +2,48 @@ import { createClient } from "@supabase/supabase-js";
 
 // Retrieve environment variables (accept both standard anon and publishable key names)
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey =
-  import.meta.env.VITE_SUPABASE_ANON_KEY ||
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const supabaseBrowserKey = [
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+].find((key) => key && !/your-|placeholder/i.test(key));
 
-// Check if valid credentials are provided
+const hasValidSupabaseUrl = (() => {
+  if (!supabaseUrl || /your-project|placeholder/i.test(supabaseUrl)) return false;
+  try {
+    const parsedUrl = new URL(supabaseUrl);
+    return parsedUrl.protocol === "https:" ||
+      (parsedUrl.protocol === "http:" && ["localhost", "127.0.0.1"].includes(parsedUrl.hostname));
+  } catch {
+    return false;
+  }
+})();
+
 export const isSupabaseConfigured = Boolean(
-  supabaseUrl &&
-  supabaseAnonKey &&
-  supabaseUrl !== "https://your-project.supabase.co" &&
-  !supabaseUrl.includes("placeholder")
+  hasValidSupabaseUrl &&
+  supabaseBrowserKey
 );
 
-// Export client instance (or dummy instance if unconfigured)
+// No client is created when public Supabase configuration is unavailable.
 export const supabase = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabaseAnonKey)
+  ? createClient(supabaseUrl, supabaseBrowserKey, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true
+      }
+    })
   : null;
+
+export async function getCurrentAuthUser() {
+  if (!supabase) return null;
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) throw sessionError;
+  if (!sessionData.session) return null;
+
+  const { data, error } = await supabase.auth.getUser();
+  if (error) throw error;
+  return data.user;
+}
 
 /**
  * Sign up a new user with email and password
@@ -75,22 +101,34 @@ export async function signOutUser() {
  * Push workspace state to Supabase cloud
  */
 export async function syncUserDataToCloud(userId, workspaceData) {
-  if (!isSupabaseConfigured || !supabase || !userId) return false;
-
-  try {
-    const { error } = await supabase
-      .from("user_workspaces")
-      .upsert({
-        user_id: userId,
-        data: workspaceData,
-        updated_at: new Date().toISOString()
-      }, { onConflict: "user_id" });
-
-    return !error;
-  } catch (err) {
-    console.warn("Cloud sync error:", err);
-    return false;
+  if (!isSupabaseConfigured || !supabase || !userId) {
+    throw new Error("Cloud workspace sync requires a configured Supabase client and signed-in user.");
   }
+
+  const { data: existingWorkspace, error: fetchError } = await supabase
+    .from("user_workspaces")
+    .select("data")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (fetchError) throw fetchError;
+  const existingData = existingWorkspace?.data;
+  const mergedData = {
+    ...(existingData && typeof existingData === "object" && !Array.isArray(existingData)
+      ? existingData
+      : {}),
+    ...workspaceData
+  };
+  const { error } = await supabase
+    .from("user_workspaces")
+    .upsert({
+      user_id: userId,
+      data: mergedData,
+      updated_at: new Date().toISOString()
+    }, { onConflict: "user_id" });
+
+  if (error) throw error;
+  return true;
 }
 
 /**
@@ -99,17 +137,12 @@ export async function syncUserDataToCloud(userId, workspaceData) {
 export async function fetchUserDataFromCloud(userId) {
   if (!isSupabaseConfigured || !supabase || !userId) return null;
 
-  try {
-    const { data, error } = await supabase
-      .from("user_workspaces")
-      .select("data")
-      .eq("user_id", userId)
-      .maybeSingle();
+  const { data, error } = await supabase
+    .from("user_workspaces")
+    .select("data")
+    .eq("user_id", userId)
+    .maybeSingle();
 
-    if (error || !data) return null;
-    return data.data;
-  } catch (err) {
-    console.warn("Fetch cloud error:", err);
-    return null;
-  }
+  if (error) throw error;
+  return data?.data ?? null;
 }

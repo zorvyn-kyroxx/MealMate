@@ -1,29 +1,23 @@
 # MealMate
 
-MealMate is a React/Vite meal-planning and food-organization app. Its public beta is designed to run as a static site: workspace data stays in browser storage, while cloud accounts, registrations, payments, donations, and ads are disabled by default.
+MealMate is a React/Vite meal-planning and food-organization app. It supports Supabase email/password accounts and cloud workspace sync when configured; without Supabase settings, it runs as a local-only app. Payments, donations, and ads remain disabled during beta.
 
 Run `npm install`, `npm run dev`, `npm run lint`, `npm run test:nutrition`, and `npm run build` from the repository root. See [LAUNCH.md](LAUNCH.md) for deployment steps and launch prerequisites.
 
-## Beta feature gates
+## Supabase authentication and cloud sync
 
-All gates are off unless explicitly set to the exact string `true`:
+Configure these Vite environment variables locally in `.env.local` and in Vercel's project environment settings:
 
-- `VITE_CLOUD_ACCOUNTS_ENABLED` enables configured Supabase account access and workspace sync.
-- `VITE_ACCOUNT_CREATION_ENABLED` enables new registrations only when cloud accounts are also enabled.
-- `VITE_PAYMENTS_ENABLED` enables subscription and donation UI flows.
+- `VITE_SUPABASE_URL`
+- Either `VITE_SUPABASE_ANON_KEY` or `VITE_SUPABASE_PUBLISHABLE_KEY`
 
-Do not enable these flags until the applicable privacy, child-safety, legal, account-deletion, and provider requirements are implemented and reviewed. Never put Supabase service-role or Razorpay secret keys in frontend `VITE_` variables.
+With a valid URL and public anon/publishable key, sign-in and registration are available. Apply `supabase_schema.sql` in the Supabase SQL Editor, apply the migrations, and configure email confirmation and allowed redirect URLs. The workspace policies restrict reads and writes to the authenticated owner, and authenticated browser clients cannot update the workspace plan column. Never put a Supabase service-role key or Razorpay secret in a frontend `VITE_` variable.
 
-## Enabling donations
+Without these values, Login/Register still opens and explains the missing configuration; workspace data remains in browser storage.
 
-The pricing page can display the server-confirmed donation total and open a one-time Razorpay checkout. Keep payments disabled (`VITE_PAYMENTS_ENABLED=false`) until the backend, legal disclosures, refund/support process, and payment-provider review are complete:
+## Payments and donations during beta
 
-1. Apply `supabase/migrations/202611270001_create_donations.sql` with `supabase db push`.
-2. Set the Supabase Edge Function secrets `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` with `supabase secrets set RAZORPAY_KEY_ID=<key-id> RAZORPAY_KEY_SECRET=<key-secret>`.
-3. Deploy the function with `supabase functions deploy donations`.
-4. Configure the frontend with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. Keep `VITE_PAYMENTS_ENABLED=false` until payment/legal review, then enable it only for the approved release.
-
-Never put the Razorpay secret or Supabase service-role key in frontend environment variables. The donation counter includes only payments confirmed as captured by Razorpay and verified by the Edge Function.
+Subscription checkout and donation UI are disabled in the application during beta. Setting an environment variable does not enable them. Keep Razorpay secrets server-side; any future payment release requires reviewed server-side order creation, signature verification, and payment/legal testing.
 
 ## Enabling secure Pro subscriptions
 
@@ -32,9 +26,9 @@ Pro access is read from the server-side `pro_subscriptions` records; browser sto
 1. Apply the Supabase migrations with `supabase db push`.
 2. Set the Edge Function secrets `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` with `supabase secrets set RAZORPAY_KEY_ID=<key-id> RAZORPAY_KEY_SECRET=<key-secret>`. Keep the Razorpay secret and Supabase service-role key out of frontend variables.
 3. Deploy the function with `supabase functions deploy subscriptions`.
-4. Configure the frontend with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. Keep cloud accounts disabled until reviewed; customers must have a verified Supabase Auth session to create an order or access Pro.
+4. Configure the frontend with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. Authentication remains available during beta; payments remain disabled in the application until separately reviewed.
 
-The function creates orders at server-defined prices and verifies the Razorpay signature and captured payment before activating Pro. The pricing UI remains fail-closed when Supabase or the subscription service is unavailable. Keep `VITE_PAYMENTS_ENABLED=false` until legal review, payment-provider setup, cancellation/refund support, and test transactions are complete; enable it only for the reviewed release.
+The function creates orders at server-defined prices and verifies the Razorpay signature and captured payment before activating Pro. The current beta UI remains hard-disabled; future activation requires an explicit reviewed code change in addition to the server setup described above.
 
 ## Smart Nutrition Calculator
 
